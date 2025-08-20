@@ -54,6 +54,7 @@ source=("https://nodejs.org/dist/v${pkgver}/node-v${pkgver}.tar.xz"
         0026-Embed-manifest-in-node-exe.patch
         0101-node-buildflags-fixes.patch
         0102-set-cxx-standard-to-gnu.patch
+        0103-node-gyp-support-mingw-toolchain.patch
         0104-v8-fix-static-assert-implementations.patch
         0105-v8-fix-conflicting-functions.patch
         0106-v8-support-clang-in-mingw-mode.patch
