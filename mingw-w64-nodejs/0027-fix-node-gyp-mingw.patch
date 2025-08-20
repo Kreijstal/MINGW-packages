@@ -1,0 +1,684 @@
+--- addon.gypi.original	2025-08-20 11:20:35.283159036 +0000
++++ addon.gypi.final	2025-08-20 11:20:35.283159036 +0000
+@@ -3,6 +3,7 @@
+     'node_engine_include_dir%': 'deps/v8/include',
+     'node_host_binary%': 'node',
+     'node_with_ltcg%': 'true',
++    'os_type%': '<!(node -p "require(\'os\').type()")',
+   },
+   'target_defaults': {
+     'type': 'loadable_module',
+@@ -165,23 +166,45 @@
+                 ]
+               }
+             }
++          }],
++          # Detect MSYS2/MinGW vs MSVC based on os.type()
++          [ 'os_type.startswith("MINGW")', {
++            # MSYS2/MinGW/GCC libraries
++            'library_dirs': [ '<(node_root_dir)/lib' ],
++            'libraries': [
++              '-lkernel32',
++              '-luser32',
++              '-lgdi32',
++              '-lwinspool',
++              '-lcomdlg32',
++              '-ladvapi32',
++              '-lshell32',
++              '-lole32',
++              '-loleaut32',
++              '-luuid',
++              '-lodbc32',
++              '-lDelayImp',
++              '-lnode',
++            ],
++          }, {
++            # MSVC libraries (Windows_NT)
++            'libraries': [
++              '-lkernel32.lib',
++              '-luser32.lib',
++              '-lgdi32.lib',
++              '-lwinspool.lib',
++              '-lcomdlg32.lib',
++              '-ladvapi32.lib',
++              '-lshell32.lib',
++              '-lole32.lib',
++              '-loleaut32.lib',
++              '-luuid.lib',
++              '-lodbc32.lib',
++              '-lDelayImp.lib',
++              '-l"<(node_lib_file)"'
++            ],
+           }]
+         ],
+-        'libraries': [
+-          '-lkernel32.lib',
+-          '-luser32.lib',
+-          '-lgdi32.lib',
+-          '-lwinspool.lib',
+-          '-lcomdlg32.lib',
+-          '-ladvapi32.lib',
+-          '-lshell32.lib',
+-          '-lole32.lib',
+-          '-loleaut32.lib',
+-          '-luuid.lib',
+-          '-lodbc32.lib',
+-          '-lDelayImp.lib',
+-          '-l"<(node_lib_file)"'
+-        ],
+         'msvs_disabled_warnings': [
+           # warning C4251: 'node::ObjectWrap::handle_' : class 'v8::Persistent<T>'
+           # needs to have dll-interface to be used by
+--- make.py.original	2025-08-20 11:21:48.488645214 +0000
++++ make.py.patched	2025-08-20 11:21:48.488645214 +0000
+@@ -22,17 +22,17 @@
+ # the side to keep the files readable.
+
+
++import hashlib
+ import os
+ import re
+ import subprocess
+ import sys
++
+ import gyp
+ import gyp.common
+ import gyp.xcode_emulation
+ from gyp.common import GetEnvironFallback
+
+-import hashlib
+-
+ generator_default_variables = {
+     "EXECUTABLE_PREFIX": "",
+     "EXECUTABLE_SUFFIX": "",
+@@ -208,7 +208,7 @@
+
+ LINK_COMMANDS_MAC = """\
+ quiet_cmd_alink = LIBTOOL-STATIC $@
+-cmd_alink = rm -f $@ && ./gyp-mac-tool filter-libtool libtool $(GYP_LIBTOOLFLAGS) -static -o $@ $(filter %.o,$^)
++cmd_alink = rm -f $@ && %(python)s gyp-mac-tool filter-libtool libtool $(GYP_LIBTOOLFLAGS) -static -o $@ $(filter %%.o,$^)
+
+ quiet_cmd_link = LINK($(TOOLSET)) $@
+ cmd_link = $(LINK.$(TOOLSET)) $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -o "$@" $(LD_INPUTS) $(LIBS)
+@@ -218,7 +218,7 @@
+
+ quiet_cmd_solink_module = SOLINK_MODULE($(TOOLSET)) $@
+ cmd_solink_module = $(LINK.$(TOOLSET)) -bundle $(GYP_LDFLAGS) $(LDFLAGS.$(TOOLSET)) -o $@ $(filter-out FORCE_DO_CMD, $^) $(LIBS)
+-"""  # noqa: E501
++""" % {'python': sys.executable}  # noqa: E501
+
+ LINK_COMMANDS_ANDROID = """\
+ quiet_cmd_alink = AR($(TOOLSET)) $@
+@@ -440,27 +440,36 @@
+ # Doesn't work with spaces, but that's fine: .d files have spaces in
+ # their names replaced with other characters."""
+     r"""
+-define fixup_dep
+-# The depfile may not exist if the input file didn't have any #includes.
+-touch $(depfile).raw
++define fixup_dep \
++# The depfile may not exist if the input file didn't have any #includes. \
++touch $(depfile).raw \
+ # Fixup path as in (1).""" +
+-    (r"""
++    (r""" \
+ sed -e "s|^$(notdir $@)|$@|" -re 's/\\\\([^$$])/\/\1/g' $(depfile).raw >> $(depfile)"""
+-    if sys.platform == 'win32' else r"""
++    if sys.platform == 'win32' else r""" \
+ sed -e "s|^$(notdir $@)|$@|" $(depfile).raw >> $(depfile)""") +
+-    r"""
+-# Add extra rules as in (2).
+-# We remove slashes and replace spaces with new lines;
+-# remove blank lines;
+-# delete the first line and append a colon to the remaining lines.""" +
+-    ("""
+-sed -e 's/\\\\\\\\$$//' -e 's/\\\\\\\\/\\//g' -e 'y| |\\n|' $(depfile).raw |\\"""
+-    if sys.platform == 'win32' else """
+-sed -e 's|\\\\||' -e 'y| |\\n|' $(depfile).raw |\\""") +
+-    r"""
+-  grep -v '^$$'                             |\
+-  sed -e 1d -e 's|$$|:|'                     \
+-    >> $(depfile)
++    r""" \
++# Add extra rules as in (2). \
++# Goal: create dummy rules for each dependency listed after the first line's colon. \
++# 1. Join continued lines into one long line ending with the list of dependencies. \
++# 2. Normalize path separators (Windows \ -> /). \
++# 3. Extract dependencies (everything after the first colon). \
++# 4. Replace spaces between dependencies with newlines. \
++# 5. Filter out empty lines. \
++# 6. Append a colon to each dependency line. \
++# NOTE: Using awk might be more robust but introduces another dependency. \
++# Sticking with sed. \
++# Process the raw file to get the list of dependencies, one per line, ending with ':' \
++# Step 1 & 2: Join lines and normalize slashes \
++sed -e ':a; /\\$$/N; s/\\\n//; ta' -e 's/\\/\//g' $(depfile).raw |\
++# Step 3 & 4: Extract deps after colon, split by space, print one per line \
++sed -n -e 's/^[^:]*: *//p' |\
++  tr -s ' ' '\n' |\
++# Step 5: Filter empty lines (e.g., from multiple spaces) \
++      grep -v '^\s*$$' |\
++# Step 6: Add the trailing colon for the dummy rule \
++  sed -e 's/$$/:/' \
++  >> $(depfile) \
+ rm $(depfile).raw
+ endef
+ """
+@@ -609,14 +618,14 @@
+ # Use $(4) for the command, since $(2) and $(3) are used as flag by do_cmd
+ # already.
+ quiet_cmd_mac_tool = MACTOOL $(4) $<
+-cmd_mac_tool = ./gyp-mac-tool $(4) $< "$@"
++cmd_mac_tool = %(python)s gyp-mac-tool $(4) $< "$@"
+
+ quiet_cmd_mac_package_framework = PACKAGE FRAMEWORK $@
+-cmd_mac_package_framework = ./gyp-mac-tool package-framework "$@" $(4)
++cmd_mac_package_framework = %(python)s gyp-mac-tool package-framework "$@" $(4)
+
+ quiet_cmd_infoplist = INFOPLIST $@
+ cmd_infoplist = $(CC.$(TOOLSET)) -E -P -Wno-trigraphs -x c $(INFOPLIST_DEFINES) "$<" -o "$@"
+-"""  # noqa: E501
++""" % {'python': sys.executable}  # noqa: E501
+
+
+ def WriteRootHeaderSuffixRules(writer):
+@@ -788,7 +797,7 @@
+         self.suffix_rules_objdir2 = {}
+
+         # Generate suffix rules for all compilable extensions.
+-        for ext in COMPILABLE_EXTENSIONS:
++        for ext, value in COMPILABLE_EXTENSIONS.items():
+             # Suffix rules for source folder.
+             self.suffix_rules_srcdir.update(
+                 {
+@@ -797,7 +806,7 @@
+ $(obj).$(TOOLSET)/$(TARGET)/%%.o: $(srcdir)/%%%s FORCE_DO_CMD
+ \t@$(call do_cmd,%s,1)
+ """
+-                        % (ext, COMPILABLE_EXTENSIONS[ext])
++                        % (ext, value)
+                     )
+                 }
+             )
+@@ -810,7 +819,7 @@
+ $(obj).$(TOOLSET)/$(TARGET)/%%.o: $(obj).$(TOOLSET)/%%%s FORCE_DO_CMD
+ \t@$(call do_cmd,%s,1)
+ """
+-                        % (ext, COMPILABLE_EXTENSIONS[ext])
++                        % (ext, value)
+                     )
+                 }
+             )
+@@ -821,7 +830,7 @@
+ $(obj).$(TOOLSET)/$(TARGET)/%%.o: $(obj)/%%%s FORCE_DO_CMD
+ \t@$(call do_cmd,%s,1)
+ """
+-                        % (ext, COMPILABLE_EXTENSIONS[ext])
++                        % (ext, value)
+                     )
+                 }
+             )
+@@ -857,6 +866,49 @@
+         else:
+             self.xcode_settings = None
+
++        self.abs_node_gyp_dir = None # Initialize
++
++        # Attempt 1: Get from spec variables
++        variables = spec.get('variables', {})
++        node_gyp_dir_from_vars = variables.get('node_gyp_dir')
++        if node_gyp_dir_from_vars:
++            try:
++                # os.path.abspath should hopefully normalize MSYS paths like /home/...
++                # to the E:/... format if run under MSYS Python.
++                normalized_path = os.path.abspath(node_gyp_dir_from_vars)
++                # Ensure it ends with a separator for clean startswith comparison later
++                if not normalized_path.endswith(os.path.sep):
++                    normalized_path += os.path.sep
++                self.abs_node_gyp_dir = normalized_path
++            except Exception as e:
++                print(
++                    f"DEBUG [make.py Write]: Failed to normalize path from "
++                    f"spec variables '{node_gyp_dir_from_vars}': {e}",
++                    file=sys.stderr
++                )
++
++        # Attempt 2: Fallback using __file__ if not found or normalization failed
++        if not self.abs_node_gyp_dir:
++             try:
++                 # __file__ gives path to make.py. Go up 5 levels.
++                 script_path = os.path.abspath(__file__)
++                 calculated_dir = os.path.dirname(
++                     os.path.dirname(
++                         os.path.dirname(
++                             os.path.dirname(
++                                 os.path.dirname(script_path)
++                             )
++                         )
++                     )
++                 )
++                 # Ensure it ends with a separator
++                 if not calculated_dir.endswith(os.path.sep):
++                     calculated_dir += os.path.sep
++                 self.abs_node_gyp_dir = calculated_dir
++             except Exception:
++                 self.abs_node_gyp_dir = None # Ensure it's None if fallback fails
++
++
+         deps, link_deps = self.ComputeDeps(spec)
+
+         # Some of the generation below can add extra output, sources, or
+@@ -1394,7 +1446,6 @@
+         part_of_all: flag indicating this target is part of 'all'
+         """
+
+-        # Write configuration-specific variables for CFLAGS, etc.
+         for configname in sorted(configs.keys()):
+             config = configs[configname]
+             self.WriteList(
+@@ -1403,7 +1454,6 @@
+                 prefix="-D",
+                 quoter=EscapeCppDefine,
+             )
+-
+             if self.flavor == "mac":
+                 cflags = self.xcode_settings.GetCflags(
+                     configname, arch=config.get("xcode_configuration_platform")
+@@ -1433,68 +1483,97 @@
+                 includes = [Sourceify(self.Absolutify(i)) for i in includes]
+             self.WriteList(includes, "INCS_%s" % configname, prefix="-I")
+
++
+         compilable = list(filter(Compilable, sources))
+-        objs = [self.Objectify(self.Absolutify(Target(c))) for c in compilable]
+-        self.WriteList(objs, "OBJS")
++        objs = [] # Store final object paths (quoted)
++        obj_map_unquoted_to_quoted = {} # Map unquoted paths used by PCH to quoted ones
++        generated_explicit_rule_for = set() # Track sources handled explicitly
+
+-        for obj in objs:
+-            assert " " not in obj, "Spaces in object filenames not supported (%s)" % obj
+-        self.WriteLn(
+-            "# Add to the list of files we specially track " "dependencies for."
+-        )
+-        self.WriteLn("all_deps += $(OBJS)")
+-        self.WriteLn()
+
+-        # Make sure our dependencies are built first.
+-        if deps:
+-            self.WriteMakeRule(
+-                ["$(OBJS)"],
+-                deps,
+-                comment="Make sure our dependencies are built " "before any of us.",
+-                order_only=True,
+-            )
++        for source_path in compilable:
+
+-        # Make sure the actions and rules run first.
+-        # If they generate any extra headers etc., the per-.o file dep tracking
+-        # will catch the proper rebuilds, so order only is still ok here.
+-        if extra_outputs:
+-            self.WriteMakeRule(
+-                ["$(OBJS)"],
+-                extra_outputs,
+-                comment="Make sure our actions/rules run " "before any of us.",
+-                order_only=True,
+-            )
++            input_to_objectify = self.Absolutify(Target(source_path))
++
++            obj_path_unquoted = self.Objectify(input_to_objectify)
++
++            quoted_obj_path = QuoteSpaces(obj_path_unquoted)
++
++            objs.append(quoted_obj_path)
++            # Store mapping for PCH
++            obj_map_unquoted_to_quoted[obj_path_unquoted] = quoted_obj_path
++
++            is_abs_source = os.path.isabs(source_path)
++            if is_abs_source:
++                dependency_source_path = QuoteSpaces(replace_sep(source_path))
++                source_ext = os.path.splitext(source_path)[1]
++                compile_cmd = COMPILABLE_EXTENSIONS.get(source_ext)
++                if compile_cmd:
++                   self.WriteLn(
++                       f"{quoted_obj_path}: {dependency_source_path} FORCE_DO_CMD"
++                   )
++                   self.WriteLn(f"\t@$(call do_cmd,{compile_cmd},1)")
++                   self.WriteLn()
++                   generated_explicit_rule_for.add(source_path)
+
+-        pchdeps = precompiled_header.GetObjDependencies(compilable, objs)
++
++        self.WriteList(objs, "OBJS") # Write the list of quoted object paths
++        obj_list_str = ' '.join(objs)
++
++        self.WriteLn("# Add to the list of files we specially track dependencies for.")
++        if obj_list_str:
++            self.WriteLn(f"all_deps += {obj_list_str}")
++        self.WriteLn()
++
++        # Dependencies on other targets/actions
++        if obj_list_str:
++            if deps:
++                quoted_deps = [QuoteSpaces(dep) for dep in deps]
++                self.WriteMakeRule(
++                    [obj_list_str],
++                    quoted_deps,
++                    comment="Make sure our dependencies are built before any of us.",
++                    order_only=True
++                )
++            if extra_outputs:
++                 self.WriteMakeRule(
++                     [obj_list_str],
++                     extra_outputs,
++                     comment="Make sure our actions/rules run before any of us.",
++                     order_only=True
++                 )
++
++        # PCH Dependencies
++        # Pass unquoted keys
++        pchdeps = precompiled_header.GetObjDependencies(
++            compilable, list(obj_map_unquoted_to_quoted.keys())
++        )
+         if pchdeps:
+             self.WriteLn("# Dependencies from obj files to their precompiled headers")
+-            for source, obj, gch in pchdeps:
+-                self.WriteLn(f"{obj}: {gch}")
++            for source, obj_unquoted, gch in pchdeps:
++                # Use map to find quoted path
++                matching_quoted_obj = obj_map_unquoted_to_quoted.get(obj_unquoted)
++                if matching_quoted_obj:
++                    self.WriteLn(f"{matching_quoted_obj}: {QuoteSpaces(gch)}")
+             self.WriteLn("# End precompiled header dependencies")
+
+-        if objs:
+-            extra_link_deps.append("$(OBJS)")
+-            self.WriteLn(
+-                """\
+-# CFLAGS et al overrides must be target-local.
+-# See "Target-specific Variable Values" in the GNU Make manual."""
++        # Apply Build Flags
++        if obj_list_str:
++            self.WriteLn("# CFLAGS et al overrides must be target-local.")
++            self.WriteLn(f"{obj_list_str}: TOOLSET := $(TOOLSET)")
++            c_flags = (
++                f"$(DEFS_$(BUILDTYPE)) $(INCS_$(BUILDTYPE)) "
++                f"{precompiled_header.GetInclude('c')} "
++                f"$(CFLAGS_$(BUILDTYPE)) $(CFLAGS_C_$(BUILDTYPE))"
++            )
++            self.WriteLn(f"{obj_list_str}: GYP_CFLAGS := {c_flags}")
++
++            cxx_flags = (
++                f"$(DEFS_$(BUILDTYPE)) $(INCS_$(BUILDTYPE)) "
++                f"{precompiled_header.GetInclude('cc')} "
++                f"$(CFLAGS_$(BUILDTYPE)) $(CFLAGS_CC_$(BUILDTYPE))"
+             )
+-            self.WriteLn("$(OBJS): TOOLSET := $(TOOLSET)")
+-            self.WriteLn(
+-                "$(OBJS): GYP_CFLAGS := "
+-                "$(DEFS_$(BUILDTYPE)) "
+-                "$(INCS_$(BUILDTYPE)) "
+-                "%s " % precompiled_header.GetInclude("c") + "$(CFLAGS_$(BUILDTYPE)) "
+-                "$(CFLAGS_C_$(BUILDTYPE))"
+-            )
+-            self.WriteLn(
+-                "$(OBJS): GYP_CXXFLAGS := "
+-                "$(DEFS_$(BUILDTYPE)) "
+-                "$(INCS_$(BUILDTYPE)) "
+-                "%s " % precompiled_header.GetInclude("cc") + "$(CFLAGS_$(BUILDTYPE)) "
+-                "$(CFLAGS_CC_$(BUILDTYPE))"
+-            )
+-            if self.flavor == "mac":
++            self.WriteLn(f"{obj_list_str}: GYP_CXXFLAGS := {cxx_flags}")
++            if self.flavor == "mac": # Add Mac flags if needed
+                 self.WriteLn(
+                     "$(OBJS): GYP_OBJCFLAGS := "
+                     "$(DEFS_$(BUILDTYPE)) "
+@@ -1516,9 +1595,35 @@
+
+         self.WritePchTargets(precompiled_header.GetPchBuildCommands())
+
+-        # If there are any object files in our input file list, link them into our
+-        # output.
+-        extra_link_deps += [source for source in sources if Linkable(source)]
++        # Add objects to link dependencies
++        if objs:
++            extra_link_deps.extend(objs)
++        linkable_input_sources = [QuoteSpaces(s) for s in sources if Linkable(s)]
++        if linkable_input_sources:
++            extra_link_deps.extend(linkable_input_sources)
++
++        # Suffix Rules for sources NOT handled explicitly
++        sources_needing_suffix_rules = [
++            s for s in sources
++            if Compilable(s) and s not in generated_explicit_rule_for
++        ]
++        if sources_needing_suffix_rules:
++             self.WriteLn("# Suffix rules, putting all outputs into $(obj).")
++             extensions = sorted(
++                 {os.path.splitext(s)[1] for s in sources_needing_suffix_rules},
++                 key=str.lower
++             )
++             for ext in extensions:
++                 if ext in self.suffix_rules_srcdir:
++                     self.WriteLn(self.suffix_rules_srcdir[ext])
++             self.WriteLn(SHARED_HEADER_SUFFIX_RULES_COMMENT2)
++             for ext in extensions:
++                 if ext in self.suffix_rules_objdir1:
++                     self.WriteLn(self.suffix_rules_objdir1[ext])
++             for ext in extensions:
++                 if ext in self.suffix_rules_objdir2:
++                     self.WriteLn(self.suffix_rules_objdir2[ext])
++             self.WriteLn("# End of this set of suffix rules")
+
+         self.WriteLn()
+
+@@ -1699,7 +1804,7 @@
+             self.WriteMakeRule(
+                 extra_outputs,
+                 deps,
+-                comment=("Preserve order dependency of " "special output on deps."),
++                comment=("Preserve order dependency of special output on deps."),
+                 order_only=True,
+             )
+
+@@ -1738,7 +1843,8 @@
+                         # into the link command, so we need lots of escaping.
+                         ldflags.append(r"-Wl,-rpath=\$$ORIGIN/")
+                         ldflags.append(r"-Wl,-rpath-link=\$(builddir)/")
+-                library_dirs = config.get("library_dirs", [])
++                if library_dirs := config.get("library_dirs", []):
++                    library_dirs = [Sourceify(self.Absolutify(i)) for i in library_dirs]
+                 ldflags += [("-L%s" % library_dir) for library_dir in library_dirs]
+                 self.WriteList(ldflags, "LDFLAGS_%s" % configname)
+                 if self.flavor == "mac":
+@@ -1779,13 +1885,13 @@
+             # using ":=".
+             self.WriteSortedXcodeEnv(self.output, self.GetSortedXcodePostbuildEnv())
+
+-            for configname in target_postbuilds:
++            for configname, value in target_postbuilds.items():
+                 self.WriteLn(
+                     "%s: TARGET_POSTBUILDS_%s := %s"
+                     % (
+                         QuoteSpaces(self.output),
+                         configname,
+-                        gyp.common.EncodePOSIXShellList(target_postbuilds[configname]),
++                        gyp.common.EncodePOSIXShellList(value),
+                     )
+                 )
+
+@@ -1834,7 +1940,7 @@
+             # Since this target depends on binary and resources which are in
+             # nested subfolders, the framework directory will be older than
+             # its dependencies usually. To prevent this rule from executing
+-            # on every build (expensive, especially with postbuilds), expliclity
++            # on every build (expensive, especially with postbuilds), explicitly
+             # update the time on the framework directory.
+             self.WriteLn("\t@touch -c %s" % QuoteSpaces(self.output))
+
+@@ -1844,7 +1950,7 @@
+                 "on the bundle, not the binary (target '%s')" % self.target
+             )
+             assert "product_dir" not in spec, (
+-                "Postbuilds do not work with " "custom product_dir"
++                "Postbuilds do not work with custom product_dir"
+             )
+
+         if self.type == "executable":
+@@ -1895,21 +2001,20 @@
+                         part_of_all,
+                         postbuilds=postbuilds,
+                     )
++            elif self.flavor in ("linux", "android"):
++                self.WriteMakeRule(
++                    [self.output_binary],
++                    link_deps,
++                    actions=["$(call create_archive,$@,$^)"],
++                )
+             else:
+-                if self.flavor in ("linux", "android"):
+-                    self.WriteMakeRule(
+-                        [self.output_binary],
+-                        link_deps,
+-                        actions=["$(call create_archive,$@,$^)"],
+-                    )
+-                else:
+-                    self.WriteDoCmd(
+-                        [self.output_binary],
+-                        link_deps,
+-                        "alink",
+-                        part_of_all,
+-                        postbuilds=postbuilds,
+-                    )
++                self.WriteDoCmd(
++                    [self.output_binary],
++                    link_deps,
++                    "alink",
++                    part_of_all,
++                    postbuilds=postbuilds,
++                )
+         elif self.type == "shared_library":
+             self.WriteLn(
+                 "%s: LD_INPUTS := %s"
+@@ -2075,9 +2180,19 @@
+         but in a pretty-printed style.
+         """
+         values = ""
++        processed_values = []
+         if value_list:
+-            value_list = [replace_sep(quoter(prefix + value)) for value in value_list]
+-            values = " \\\n\t" + " \\\n\t".join(value_list)
++            for value in value_list:
++                prefixed_value = prefix + value
++                processed = None
++                if (variable == 'LIBS' and
++                    value.startswith('-l"') and value.endswith('"')):
++                     processed = value
++                else:
++                    quoted_value = quoter(prefixed_value)
++                    processed = replace_sep(quoted_value)
++                processed_values.append(processed)
++            values = " \\\n\t" + " \\\n\t".join(processed_values)
+         self.fp.write(f"{variable} :={values}\n\n")
+
+     def WriteDoCmd(
+@@ -2305,14 +2420,55 @@
+             # it does not -- the backslash is written to the env as literal character.
+             # So don't escape spaces in |env[k]|.
+             self.WriteLn(f"{QuoteSpaces(target)}: export {k} := {v}")
+-
+     def Objectify(self, path):
+-        """Convert a path to its output directory form."""
+-        if "$(" in path:
+-            path = path.replace("$(obj)/", "$(obj).%s/$(TARGET)/" % self.toolset)
+-        if "$(obj)" not in path:
+-            path = f"$(obj).{self.toolset}/$(TARGET)/{path}"
+-        return path
++                """Convert a path to its output directory form."""
++
++                path_segment = path # Start with the original path segment
++
++                is_abs_path = os.path.isabs(path)
++                is_in_node_gyp_dir = False
++                # Ensure self.abs_node_gyp_dir was successfully set in Write()
++                if (is_abs_path and self.abs_node_gyp_dir and
++                    path.startswith(self.abs_node_gyp_dir)):
++                     is_in_node_gyp_dir = True
++
++
++                if is_in_node_gyp_dir:
++                     try:
++                         # Calculate path relative to abs_node_gyp_dir itself.
++                         # Use node_gyp_dir as base
++                         base_for_relpath = self.abs_node_gyp_dir
++                         rel_path = os.path.relpath(path, base_for_relpath)
++                         # Ensure forward slashes for Makefile compatibility
++                         rel_path_unix = rel_path.replace('\\', '/')
++                         # Use the relative path segment instead!
++                         path_segment = rel_path_unix
++                     except ValueError as e:
++                         print(
++                             f"DEBUG [make.py Objectify]: os.path.relpath failed: {e}. "
++                             f"Using original absolute path segment.",
++                             file=sys.stderr
++                         )
++
++                # Initialize final path with the (potentially modified) segment
++                final_path = path_segment
++
++                # Check 1: Handle paths already containing variables like $(obj)/
++                if "$(" in path_segment:
++                    if path_segment.startswith("$(obj)/"):
++                         final_path = path_segment.replace(
++                             "$(obj)/",
++                             f"$(obj).{self.toolset}/$(TARGET)/",
++                             1                          )
++                    # else: path remains path_segment if it has $(...) but not
++                    # $(obj)/ start
++                # Check 2: Prepend prefix if path segment doesn't contain $(obj)
++                elif "$(obj)" not in path_segment:
++                    prefix = f"$(obj).{self.toolset}/$(TARGET)/"
++                    # PREPEND PREFIX
++                    final_path = prefix + path_segment
++
++                return final_path
+
+     def Pchify(self, path, lang):
+         """Convert a prefix header path to its output directory form."""
+@@ -2498,7 +2654,7 @@
+         "PLI.host": PLI_host,
+     }
+     if flavor == "mac":
+-        flock_command = "./gyp-mac-tool flock"
++        flock_command = "%s gyp-mac-tool flock" % sys.executable
+         header_params.update(
+             {
+                 "flock": flock_command,
+@@ -2548,7 +2704,7 @@
+         header_params.update(
+             {
+                 "copy_archive_args": copy_archive_arguments,
+-                "flock": "./gyp-flock-tool flock",
++                "flock": "%s gyp-flock-tool flock" % sys.executable,
+                 "flock_index": 2,
+             }
+         )
+@@ -2564,7 +2720,7 @@
+             {
+                 "copy_archive_args": copy_archive_arguments,
+                 "link_commands": LINK_COMMANDS_AIX,
+-                "flock": "./gyp-flock-tool flock",
++                "flock": "%s gyp-flock-tool flock" % sys.executable,
+                 "flock_index": 2,
+             }
+         )
+@@ -2574,7 +2730,7 @@
+             {
+                 "copy_archive_args": copy_archive_arguments,
+                 "link_commands": LINK_COMMANDS_OS400,
+-                "flock": "./gyp-flock-tool flock",
++                "flock": "%s gyp-flock-tool flock" % sys.executable,
+                 "flock_index": 2,
+             }
+         )
