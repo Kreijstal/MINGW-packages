@@ -1,6 +1,5 @@
-diff -Naur a/deps/npm/node_modules/node-gyp/addon.gypi b/deps/npm/node_modules/node-gyp/addon.gypi
---- a/deps/npm/node_modules/node-gyp/addon.gypi	2025-08-20 08:41:02.871392607 +0000
-+++ b/deps/npm/node_modules/node-gyp/addon.gypi	2025-08-20 08:41:02.875392965 +0000
+--- addon.gypi.original	2025-08-20 11:20:35.283159036 +0000
++++ addon.gypi.final	2025-08-20 11:20:35.283159036 +0000
 @@ -3,6 +3,7 @@
      'node_engine_include_dir%': 'deps/v8/include',
      'node_host_binary%': 'node',
@@ -9,7 +8,7 @@ diff -Naur a/deps/npm/node_modules/node-gyp/addon.gypi b/deps/npm/node_modules/n
    },
    'target_defaults': {
      'type': 'loadable_module',
-@@ -165,23 +166,44 @@
+@@ -165,23 +166,45 @@
                  ]
                }
              }
@@ -17,6 +16,7 @@ diff -Naur a/deps/npm/node_modules/node-gyp/addon.gypi b/deps/npm/node_modules/n
 +          # Detect MSYS2/MinGW vs MSVC based on os.type()
 +          [ 'os_type.startswith("MINGW")', {
 +            # MSYS2/MinGW/GCC libraries
++            'library_dirs': [ '<(node_root_dir)/lib' ],
 +            'libraries': [
 +              '-lkernel32',
 +              '-luser32',
@@ -69,9 +69,8 @@ diff -Naur a/deps/npm/node_modules/node-gyp/addon.gypi b/deps/npm/node_modules/n
          'msvs_disabled_warnings': [
            # warning C4251: 'node::ObjectWrap::handle_' : class 'v8::Persistent<T>'
            # needs to have dll-interface to be used by
-diff -Naur a/deps/npm/node_modules/node-gyp/gyp/pylib/gyp/generator/make.py b/deps/npm/node_modules/node-gyp/gyp/pylib/gyp/generator/make.py
---- a/deps/npm/node_modules/node-gyp/gyp/pylib/gyp/generator/make.py	2025-08-20 08:41:02.871392607 +0000
-+++ b/deps/npm/node_modules/node-gyp/gyp/pylib/gyp/generator/make.py	2025-08-20 08:41:02.875392965 +0000
+--- make.py.original	2025-08-20 11:21:48.488645214 +0000
++++ make.py.patched	2025-08-20 11:21:48.488645214 +0000
 @@ -22,17 +22,17 @@
  # the side to keep the files readable.
 
