@@ -1,0 +1,252 @@
+# Maintainer: MINGW-packages team
+
+_realname=java-http-client
+pkgbase=mingw-w64-${_realname}
+pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}")
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Simple Java HTTP client utility source and examples (mingw-w64)"
+arch=('any')
+mingw_arch=('mingw32' 'mingw64' 'ucrt64' 'clang64' 'clangarm64')
+url='https://github.com/Kreijstal/MINGW-packages'
+license=('MIT')
+makedepends=()
+depends=()
+source=()
+sha256sums=()
+
+prepare() {
+  mkdir -p "${srcdir}/${_realname}-${pkgver}/src"
+}
+
+build() {
+  cd "${srcdir}/${_realname}-${pkgver}"
+  
+  # Create the Java HTTP client utility source
+  cat > src/HttpClientUtil.java << 'EOF'
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+
+/**
+ * Simple HTTP client utility for testing and demonstration purposes.
+ * Uses Java 11+ HttpClient APIs.
+ */
+public class HttpClientUtil {
+    
+    private static final HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+    
+    public static void main(String[] args) {
+        if (args.length < 1) {
+            System.err.println("Usage: java HttpClientUtil <URL> [method] [body]");
+            System.err.println("  URL    - The URL to request");
+            System.err.println("  method - HTTP method (GET, POST, PUT, DELETE) - default: GET");
+            System.err.println("  body   - Request body for POST/PUT requests");
+            System.exit(1);
+        }
+        
+        String url = args[0];
+        String method = args.length > 1 ? args[1].toUpperCase() : "GET";
+        String body = args.length > 2 ? args[2] : null;
+        
+        try {
+            HttpResponse<String> response = performRequest(url, method, body);
+            
+            System.out.println("Status Code: " + response.statusCode());
+            System.out.println("Headers:");
+            response.headers().map().forEach((key, value) -> 
+                System.out.println("  " + key + ": " + String.join(", ", value)));
+            System.out.println();
+            System.out.println("Response Body:");
+            System.out.println(response.body());
+            
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Request failed: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+    
+    private static HttpResponse<String> performRequest(String url, String method, String body) 
+            throws IOException, InterruptedException {
+        
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30))
+                .header("User-Agent", "MINGW-Java-HTTP-Client/1.0");
+        
+        switch (method) {
+            case "GET":
+                requestBuilder.GET();
+                break;
+            case "POST":
+                if (body != null) {
+                    requestBuilder.POST(HttpRequest.BodyPublishers.ofString(body))
+                              .header("Content-Type", "application/json");
+                } else {
+                    requestBuilder.POST(HttpRequest.BodyPublishers.noBody());
+                }
+                break;
+            case "PUT":
+                if (body != null) {
+                    requestBuilder.PUT(HttpRequest.BodyPublishers.ofString(body))
+                              .header("Content-Type", "application/json");
+                } else {
+                    requestBuilder.PUT(HttpRequest.BodyPublishers.noBody());
+                }
+                break;
+            case "DELETE":
+                requestBuilder.DELETE();
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported HTTP method: " + method);
+        }
+        
+        HttpRequest request = requestBuilder.build();
+        return client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+}
+EOF
+
+  # Create a build script for compiling the Java source
+  cat > build.sh << 'EOF'
+#!/bin/bash
+# Build script for Java HTTP Client Utility
+# Requires Java 11 or later
+
+echo "Compiling HttpClientUtil..."
+javac src/HttpClientUtil.java -d .
+
+if [ $? -eq 0 ]; then
+    echo "Creating JAR file..."
+    echo "Manifest-Version: 1.0" > manifest.mf
+    echo "Main-Class: HttpClientUtil" >> manifest.mf
+    jar cfm java-http-client.jar manifest.mf HttpClientUtil.class
+    
+    if [ $? -eq 0 ]; then
+        echo "Build successful! JAR file: java-http-client.jar"
+        echo "Usage: java -jar java-http-client.jar <URL> [method] [body]"
+    else
+        echo "JAR creation failed!"
+        exit 1
+    fi
+else
+    echo "Compilation failed!"
+    exit 1
+fi
+EOF
+  chmod +x build.sh
+}
+
+package() {
+  cd "${srcdir}/${_realname}-${pkgver}"
+  
+  # Install the Java source files
+  mkdir -p "${pkgdir}${MINGW_PREFIX}/share/${_realname}/src"
+  cp -r src/* "${pkgdir}${MINGW_PREFIX}/share/${_realname}/src/"
+  
+  # Install the build script
+  install -Dm755 build.sh "${pkgdir}${MINGW_PREFIX}/share/${_realname}/build.sh"
+  
+  # Install documentation
+  mkdir -p "${pkgdir}${MINGW_PREFIX}/share/doc/${_realname}"
+  cat > "${pkgdir}${MINGW_PREFIX}/share/doc/${_realname}/README.md" << 'EOF'
+# Java HTTP Client Utility
+
+A simple command-line HTTP client utility built with Java 11+ HttpClient APIs.
+
+## Requirements
+
+- Java 11 or later (with javac and jar tools)
+- Network connectivity for HTTP requests
+
+## Building
+
+Navigate to the installation directory and run the build script:
+
+```bash
+cd ${MINGW_PREFIX}/share/java-http-client
+./build.sh
+```
+
+This will compile the Java source and create a `java-http-client.jar` file.
+
+## Usage
+
+```bash
+java -jar java-http-client.jar <URL> [method] [body]
+```
+
+### Parameters
+
+- `URL` - The URL to request (required)
+- `method` - HTTP method (GET, POST, PUT, DELETE) - default: GET
+- `body` - Request body for POST/PUT requests (optional)
+
+### Examples
+
+```bash
+# Simple GET request
+java -jar java-http-client.jar https://httpbin.org/get
+
+# POST request with JSON body
+java -jar java-http-client.jar https://httpbin.org/post POST '{"key": "value"}'
+
+# PUT request
+java -jar java-http-client.jar https://httpbin.org/put PUT '{"updated": true}'
+
+# DELETE request
+java -jar java-http-client.jar https://httpbin.org/delete DELETE
+```
+
+## Features
+
+- Support for GET, POST, PUT, DELETE methods
+- JSON request body support
+- Configurable timeouts (10s connect, 30s request)
+- Response headers and body display
+- Built with Java 11+ HttpClient APIs
+
+## Source Code
+
+The Java source code uses the following imports:
+
+```java
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+```
+
+This demonstrates proper usage of the Java HTTP client APIs introduced in Java 11.
+EOF
+
+  # Create a license file
+  cat > "${pkgdir}${MINGW_PREFIX}/share/doc/${_realname}/LICENSE" << 'EOF'
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+EOF
+}
