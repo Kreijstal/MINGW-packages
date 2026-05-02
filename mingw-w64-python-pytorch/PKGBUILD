@@ -87,6 +87,8 @@ build() {
   export USE_XPU=0
   export USE_ITT=0
   export BLAS=OpenBLAS
+  export OpenBLAS_HOME="${MINGW_PREFIX}"
+  export OpenBLAS_LIB_NAME=openblas
 
   ${MINGW_PREFIX}/bin/python setup.py bdist_wheel
 }
