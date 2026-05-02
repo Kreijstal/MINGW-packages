@@ -1,0 +1,238 @@
+diff --git a/aten/src/ATen/native/quantized/cpu/qlinear.h b/aten/src/ATen/native/quantized/cpu/qlinear.h
+index 60501c6b537..e4b148e2932 100644
+--- a/aten/src/ATen/native/quantized/cpu/qlinear.h
++++ b/aten/src/ATen/native/quantized/cpu/qlinear.h
+@@ -42,7 +42,11 @@ C10_API static Tensor run_pointwise_binary_tensor(
+       std::string_view unary_post_op_algorithm);
+ };
+
++#if defined(__MINGW32__)
++Tensor _weight_int4pack_mm_cpu_tensor(
++#else
+ C10_API Tensor _weight_int4pack_mm_cpu_tensor(
++#endif
+     const Tensor& A,
+     const Tensor& B,
+     const Tensor& qGroupSize,
+diff --git a/c10/core/impl/LocalDispatchKeySet.cpp b/c10/core/impl/LocalDispatchKeySet.cpp
+index c8277f19acc..e34cf516b7e 100644
+--- a/c10/core/impl/LocalDispatchKeySet.cpp
++++ b/c10/core/impl/LocalDispatchKeySet.cpp
+@@ -13,11 +13,11 @@ namespace c10::impl {
+ // logic is encapsulated in struct PODLocalDispatchKeySet.
+ thread_local PODLocalDispatchKeySet raw_local_dispatch_key_set;
+
+-#if defined(_MSC_VER) || defined(C10_ANDROID) || defined(C10_IPHONE)
++#if defined(_WIN32) || defined(C10_ANDROID) || defined(C10_IPHONE)
+ LocalDispatchKeySet tls_local_dispatch_key_set() {
+   return raw_local_dispatch_key_set;
+ }
+-#endif // defined(_MSC_VER) || defined(C10_ANDROID) || defined(C10_IPHONE)
++#endif // defined(_WIN32) || defined(C10_ANDROID) || defined(C10_IPHONE)
+
+ void _force_tls_local_dispatch_key_set(LocalDispatchKeySet key_set) {
+   raw_local_dispatch_key_set.set_included(key_set.included_);
+diff --git a/c10/core/impl/LocalDispatchKeySet.h b/c10/core/impl/LocalDispatchKeySet.h
+index bd8fe811b2c..a48d4243446 100644
+--- a/c10/core/impl/LocalDispatchKeySet.h
++++ b/c10/core/impl/LocalDispatchKeySet.h
+@@ -62,9 +62,9 @@ struct C10_API LocalDispatchKeySet {
+
+ // thread_local variables cannot be C10_API on Windows.
+ // Inlining this seems to break AutoDispatchBelowAutograd on Android.
+-#if defined(_MSC_VER) || defined(C10_ANDROID) || defined(C10_IPHONE)
++#if defined(_WIN32) || defined(C10_ANDROID) || defined(C10_IPHONE)
+ C10_API LocalDispatchKeySet tls_local_dispatch_key_set();
+-#else // defined(_MSC_VER) || defined(C10_ANDROID) || defined(C10_IPHONE)
++#else // defined(_WIN32) || defined(C10_ANDROID) || defined(C10_IPHONE)
+ extern C10_API thread_local PODLocalDispatchKeySet raw_local_dispatch_key_set;
+
+ inline C10_API LocalDispatchKeySet tls_local_dispatch_key_set() {
+@@ -72,7 +72,7 @@ inline C10_API LocalDispatchKeySet tls_local_dispatch_key_set() {
+   // because they include this header.
+   return raw_local_dispatch_key_set;
+ }
+-#endif // defined(_MSC_VER) || defined(C10_ANDROID) || defined(C10_IPHONE)
++#endif // defined(_WIN32) || defined(C10_ANDROID) || defined(C10_IPHONE)
+
+ // Internal, use ThreadLocalStateGuard
+ C10_API void _force_tls_local_dispatch_key_set(LocalDispatchKeySet key_set);
+diff --git a/c10/util/Flags.h b/c10/util/Flags.h
+index 0d460db224a..ede60e8105e 100644
+--- a/c10/util/Flags.h
++++ b/c10/util/Flags.h
+@@ -215,7 +215,11 @@ C10_DECLARE_REGISTRY(C10FlagsRegistry, C10FlagParser, const std::string&);
+   C10_DEFINE_typed_var(std::string, name, default_value, help_str)
+
+ // DECLARE_typed_var should be used in header files and in the global namespace.
++#if defined(__MINGW32__)
++#define C10_DECLARE_typed_var(type, name) extern type FLAGS_##name
++#else
+ #define C10_DECLARE_typed_var(type, name) C10_API extern type FLAGS_##name
++#endif
+
+ #define C10_DECLARE_int(name) C10_DECLARE_typed_var(int, name)
+ #define C10_DECLARE_int32(name) C10_DECLARE_int(name)
+diff --git a/c10/util/env.cpp b/c10/util/env.cpp
+index 673c7d1c2ce..2df3a7d2278 100644
+--- a/c10/util/env.cpp
++++ b/c10/util/env.cpp
+@@ -15,25 +15,28 @@ static std::shared_mutex& get_env_mutex() {
+ // Set an environment variable.
+ void set_env(const char* name, const char* value, bool overwrite) {
+   std::lock_guard lk(get_env_mutex());
++#ifdef _WIN32
+ #ifdef _MSC_VER
+ #pragma warning(push)
+ #pragma warning(disable : 4996)
++#endif
+   if (!overwrite) {
+     // NOLINTNEXTLINE(concurrency-mt-unsafe)
+     if (std::getenv(name) != nullptr) {
+       return;
+     }
+   }
+-  auto full_env_variable = fmt::format("{}={}", name, value);
+   // NOLINTNEXTLINE(concurrency-mt-unsafe)
+-  auto err = putenv(full_env_variable.c_str());
++  auto err = _putenv_s(name, value);
+   TORCH_INTERNAL_ASSERT(
+       err == 0,
+-      "putenv failed for environment \"",
++      "_putenv_s failed for environment \"",
+       name,
+       "\", the error is: ",
+       err);
++#ifdef _MSC_VER
+ #pragma warning(pop)
++#endif
+ #else
+   // NOLINTNEXTLINE(concurrency-mt-unsafe)
+   auto err = setenv(name, value, static_cast<int>(overwrite));
+diff --git a/c10/util/tempfile.cpp b/c10/util/tempfile.cpp
+index 86a7b75f973..fcd3fcee7e2 100644
+--- a/c10/util/tempfile.cpp
++++ b/c10/util/tempfile.cpp
+@@ -12,6 +12,8 @@
+ #include <fcntl.h>
+ #include <fileapi.h>
+ #include <io.h>
++#include <share.h>
++#include <sys/stat.h>
+ #endif // defined(_WIN32)
+
+ // Creates the filename pattern passed to and completed by `mkstemp`.
+diff --git a/caffe2/utils/threadpool/WorkersPool.h b/caffe2/utils/threadpool/WorkersPool.h
+index 6504d70c25c..87bb1cc6bc9 100644
+--- a/caffe2/utils/threadpool/WorkersPool.h
++++ b/caffe2/utils/threadpool/WorkersPool.h
+@@ -7,9 +7,12 @@
+ #include <c10/util/irange.h>
+ #include <c10/util/Logging.h>
+
++#if defined(_WIN32)
++#include <malloc.h>
+ #if defined(_MSC_VER)
+ #include <intrin.h>
+ #endif
++#endif
+
+ namespace caffe2 {
+
+@@ -36,7 +39,7 @@ struct AllocAligned {
+
+ #if defined(__ANDROID__)
+     p = memalign(kGEMMLOWPCacheLineSize, sizeof(T));
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+     p = _aligned_malloc(sizeof(T), kGEMMLOWPCacheLineSize);
+ #else
+     auto res = posix_memalign(&p, kGEMMLOWPCacheLineSize, sizeof(T));
+@@ -54,7 +57,7 @@ struct AllocAligned {
+   static void release(T* p) {
+     if (p) {
+       p->~T();
+-#if defined(_MSC_VER)
++#if defined(_WIN32)
+       _aligned_free((void*)p);
+ #else
+       free((void*)p);
+diff --git a/cmake/public/utils.cmake b/cmake/public/utils.cmake
+index a667ad55771..423c012d0a3 100644
+--- a/cmake/public/utils.cmake
++++ b/cmake/public/utils.cmake
+@@ -120,7 +120,7 @@ endfunction()
+ macro(caffe2_update_option variable value)
+   if(CAFFE2_CMAKE_BUILDING_WITH_MAIN_REPO)
+     get_property(__help_string CACHE ${variable} PROPERTY HELPSTRING)
+-    set(${variable} ${value} CACHE BOOL ${__help_string} FORCE)
++    set(${variable} ${value} CACHE BOOL "${__help_string}" FORCE)
+   else()
+     set(${variable} ${value})
+   endif()
+diff --git a/torch/csrc/jit/codegen/fuser/cpu/temp_file.h b/torch/csrc/jit/codegen/fuser/cpu/temp_file.h
+index dd21f7573f3..833f6251bde 100644
+--- a/torch/csrc/jit/codegen/fuser/cpu/temp_file.h
++++ b/torch/csrc/jit/codegen/fuser/cpu/temp_file.h
+@@ -24,7 +24,7 @@
+
+ namespace torch::jit::fuser::cpu {
+
+-#ifdef _MSC_VER
++#ifdef _WIN32
+ inline int wmkstemps(wchar_t* tmpl, int suffix_len) {
+   int len;
+   wchar_t* name;
+@@ -61,7 +61,7 @@ struct TempFile {
+   AT_DISALLOW_COPY_AND_ASSIGN(TempFile);
+
+   TempFile(const std::string& t, int suffix) {
+-#ifdef _MSC_VER
++#ifdef _WIN32
+     auto wt = c10::u8u16(t);
+     std::vector<wchar_t> tt(wt.c_str(), wt.c_str() + wt.size() + 1);
+     int fd = wmkstemps(tt.data(), suffix);
+@@ -95,7 +95,7 @@ struct TempFile {
+     AT_ASSERT(str.size() == result);
+   }
+
+-#ifdef _MSC_VER
++#ifdef _WIN32
+   void close() {
+     if (file_ != nullptr) {
+       fclose(file_);
+@@ -109,7 +109,7 @@ struct TempFile {
+   }
+
+   ~TempFile() {
+-#ifdef _MSC_VER
++#ifdef _WIN32
+     if (file_ != nullptr) {
+       fclose(file_);
+     }
+diff --git a/torch/csrc/jit/frontend/strtod.cpp b/torch/csrc/jit/frontend/strtod.cpp
+index daf768ee625..ae8a72d0096 100644
+--- a/torch/csrc/jit/frontend/strtod.cpp
++++ b/torch/csrc/jit/frontend/strtod.cpp
+@@ -26,7 +26,7 @@
+
+ namespace torch::jit {
+
+-#ifdef _MSC_VER
++#ifdef _WIN32
+ double strtod_c(const char* nptr, char** endptr) {
+   static _locale_t loc = _create_locale(LC_ALL, "C");
+   return _strtod_l(nptr, endptr, loc);
+diff --git a/torch/headeronly/macros/Macros.h b/torch/headeronly/macros/Macros.h
+index cef99df3f56..9df801ebcde 100644
+--- a/torch/headeronly/macros/Macros.h
++++ b/torch/headeronly/macros/Macros.h
+@@ -421,7 +421,7 @@ static inline int C10_WARP_SIZE_INTERNAL() {
+ #define CUDA_KERNEL_ASSERT_MSG(cond, msg)
+ #define CUDA_KERNEL_ASSERT_PRINTF(cond, msg, ...)
+ #define SYCL_KERNEL_ASSERT(cond)
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+ #if defined(NDEBUG)
+ extern "C" {
+ C10_IMPORT

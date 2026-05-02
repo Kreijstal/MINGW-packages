@@ -1,0 +1,8 @@
+diff --git a/onnx/common/path.h b/onnx/common/path.h
+index 6ded89876..cabce2134 100644
+--- a/onnx/common/path.h
++++ b/onnx/common/path.h
+@@ -16,0 +17,3 @@
++#ifdef OPTIONAL
++#undef OPTIONAL
++#endif
