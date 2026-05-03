@@ -66,7 +66,7 @@ sha256sums=('SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
-            '50d32212c5c01fa52c8d7e3901ac71291a25d53a9d3e405e0bd5374d04638e00'
+            '7b37b4cd7800d70d0446255444d9900d484f9df912869f0e340502b8208ecfa0'
             '5d5c8399bb8c26fba3bb8ef9cdabd6ec9c67ae289c1de4770356514469b0b952')
 
 apply_patch_with_msg() {

@@ -402,6 +402,28 @@ index daf768ee625..ae8a72d0096 100644
  double strtod_c(const char* nptr, char** endptr) {
    static _locale_t loc = _create_locale(LC_ALL, "C");
    return _strtod_l(nptr, endptr, loc);
+diff --git a/torch/csrc/jit/serialization/mobile_bytecode_generated.h b/torch/csrc/jit/serialization/mobile_bytecode_generated.h
+index 06f527d56a2..ddbfa317b96 100644
+--- a/torch/csrc/jit/serialization/mobile_bytecode_generated.h
++++ b/torch/csrc/jit/serialization/mobile_bytecode_generated.h
+@@ -6,12 +6,11 @@
+
+ #include "flatbuffers/flatbuffers.h"
+
+-// Ensure the included flatbuffers.h is the same version as when this file was
+-// generated, otherwise it may not be compatible.
+-static_assert(FLATBUFFERS_VERSION_MAJOR == 24 &&
+-              FLATBUFFERS_VERSION_MINOR == 12 &&
+-              FLATBUFFERS_VERSION_REVISION == 23,
+-             "Non-compatible flatbuffers version included");
++// PyTorch ships this generated header, but distro builds use the system
++// flatbuffers headers. Keep the upstream minimum while allowing newer
++// flatbuffers releases packaged by MSYS2.
++static_assert(FLATBUFFERS_VERSION_MAJOR >= 24,
++              "Non-compatible flatbuffers version included");
+
+ namespace torch {
+ namespace jit {
 diff --git a/torch/csrc/profiler/kineto_shim.h b/torch/csrc/profiler/kineto_shim.h
 index c4efd7785b7..8aeec5c6891 100644
 --- a/torch/csrc/profiler/kineto_shim.h
