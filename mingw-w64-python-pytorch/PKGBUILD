@@ -39,9 +39,43 @@ makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
              "${MINGW_PACKAGE_PREFIX}-python-yaml")
 options=(!strip)
 source=("${_realname}::git+https://github.com/pytorch/pytorch.git#tag=v${pkgver}"
+        "${_realname}-FP16::git+https://github.com/Maratyszcza/FP16.git"
+        "${_realname}-FXdiv::git+https://github.com/Maratyszcza/FXdiv.git"
+        "${_realname}-benchmark::git+https://github.com/google/benchmark.git"
+        "${_realname}-cpp-httplib::git+https://github.com/yhirose/cpp-httplib.git"
+        "${_realname}-cpuinfo::git+https://github.com/pytorch/cpuinfo.git"
+        "${_realname}-flatbuffers::git+https://github.com/google/flatbuffers.git"
+        "${_realname}-fmt::git+https://github.com/fmtlib/fmt.git"
+        "${_realname}-googletest::git+https://github.com/google/googletest.git"
+        "${_realname}-json::git+https://github.com/nlohmann/json.git"
+        "${_realname}-mimalloc::git+https://github.com/microsoft/mimalloc.git"
+        "${_realname}-onnx::git+https://github.com/onnx/onnx.git"
+        "${_realname}-pocketfft::git+https://github.com/mreineck/pocketfft.git"
+        "${_realname}-protobuf::git+https://github.com/protocolbuffers/protobuf.git"
+        "${_realname}-psimd::git+https://github.com/Maratyszcza/psimd.git"
+        "${_realname}-pthreadpool::git+https://github.com/Maratyszcza/pthreadpool.git"
+        "${_realname}-pybind11::git+https://github.com/pybind/pybind11.git"
+        "${_realname}-sleef::git+https://github.com/shibatch/sleef.git"
         "0001-pytorch-mingw-port.patch"
         "0002-third_party-onnx-optional-macro.patch")
 sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
             '681204f62fb38872311928d01510c67b0387e3fd55e1599952d386bb62bffcdb'
             '5d5c8399bb8c26fba3bb8ef9cdabd6ec9c67ae289c1de4770356514469b0b952')
 
@@ -55,7 +89,50 @@ apply_patch_with_msg() {
 prepare() {
   cd "${srcdir}/${_realname}"
 
-  git submodule update --init --recursive --depth=1
+  git submodule init
+  git config submodule."third_party/FP16".url "${srcdir}/${_realname}-FP16"
+  git config submodule."third_party/FXdiv".url "${srcdir}/${_realname}-FXdiv"
+  git config submodule."third_party/benchmark".url "${srcdir}/${_realname}-benchmark"
+  git config submodule."third_party/cpp-httplib".url "${srcdir}/${_realname}-cpp-httplib"
+  git config submodule."third_party/cpuinfo".url "${srcdir}/${_realname}-cpuinfo"
+  git config submodule."third_party/flatbuffers".url "${srcdir}/${_realname}-flatbuffers"
+  git config submodule."third_party/fmt".url "${srcdir}/${_realname}-fmt"
+  git config submodule."third_party/googletest".url "${srcdir}/${_realname}-googletest"
+  git config submodule."third_party/mimalloc".url "${srcdir}/${_realname}-mimalloc"
+  git config submodule."third_party/nlohmann".url "${srcdir}/${_realname}-json"
+  git config submodule."third_party/onnx".url "${srcdir}/${_realname}-onnx"
+  git config submodule."third_party/pocketfft".url "${srcdir}/${_realname}-pocketfft"
+  git config submodule."third_party/protobuf".url "${srcdir}/${_realname}-protobuf"
+  git config submodule."third_party/psimd".url "${srcdir}/${_realname}-psimd"
+  git config submodule."third_party/pthreadpool".url "${srcdir}/${_realname}-pthreadpool"
+  git config submodule."third_party/pybind11".url "${srcdir}/${_realname}-pybind11"
+  git config submodule."third_party/sleef".url "${srcdir}/${_realname}-sleef"
+
+  git -c protocol.file.allow=always submodule update --init \
+    third_party/FP16 \
+    third_party/FXdiv \
+    third_party/benchmark \
+    third_party/cpp-httplib \
+    third_party/cpuinfo \
+    third_party/flatbuffers \
+    third_party/fmt \
+    third_party/googletest \
+    third_party/mimalloc \
+    third_party/nlohmann \
+    third_party/onnx \
+    third_party/pocketfft \
+    third_party/protobuf \
+    third_party/psimd \
+    third_party/pthreadpool \
+    third_party/pybind11 \
+    third_party/sleef
+
+  git -C third_party/protobuf submodule init
+  git -C third_party/protobuf config submodule."third_party/benchmark".url "${srcdir}/${_realname}-benchmark"
+  git -C third_party/protobuf config submodule."third_party/googletest".url "${srcdir}/${_realname}-googletest"
+  git -C third_party/protobuf -c protocol.file.allow=always submodule update --init \
+    third_party/benchmark \
+    third_party/googletest
 
   apply_patch_with_msg \
     0001-pytorch-mingw-port.patch
