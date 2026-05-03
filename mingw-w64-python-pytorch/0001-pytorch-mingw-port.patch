@@ -169,6 +169,21 @@ index 6504d70c25c..87bb1cc6bc9 100644
        _aligned_free((void*)p);
  #else
        free((void*)p);
+diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
+index 1e20bd26273..36de6440ed7 100644
+--- a/cmake/Dependencies.cmake
++++ b/cmake/Dependencies.cmake
+@@ -1707,8 +1707,9 @@ add_library(httplib INTERFACE IMPORTED)
+ target_include_directories(httplib SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/third_party/cpp-httplib)
+
+ # Include nlohmann-json
++find_package(nlohmann_json CONFIG REQUIRED)
+ add_library(nlohmann INTERFACE IMPORTED)
+-include_directories(nlohmann SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/third_party/nlohmann/include)
++target_link_libraries(nlohmann INTERFACE nlohmann_json::nlohmann_json)
+
+ # Include moodycamel
+ add_library(moodycamel INTERFACE IMPORTED)
 diff --git a/cmake/public/utils.cmake b/cmake/public/utils.cmake
 index a667ad55771..423c012d0a3 100644
 --- a/cmake/public/utils.cmake

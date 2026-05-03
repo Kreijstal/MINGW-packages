@@ -24,6 +24,7 @@ depends=("${MINGW_PACKAGE_PREFIX}-python"
          "${MINGW_PACKAGE_PREFIX}-python-sympy"
          "${MINGW_PACKAGE_PREFIX}-python-typing_extensions"
          "${MINGW_PACKAGE_PREFIX}-gcc-libs"
+         "${MINGW_PACKAGE_PREFIX}-nlohmann-json"
          "${MINGW_PACKAGE_PREFIX}-openblas")
 makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
              "${MINGW_PACKAGE_PREFIX}-cmake"
@@ -47,7 +48,6 @@ source=("${_realname}::git+https://github.com/pytorch/pytorch.git#tag=v${pkgver}
         "${_realname}-flatbuffers::git+https://github.com/google/flatbuffers.git"
         "${_realname}-fmt::git+https://github.com/fmtlib/fmt.git"
         "${_realname}-googletest::git+https://github.com/google/googletest.git"
-        "${_realname}-json::git+https://github.com/nlohmann/json.git"
         "${_realname}-mimalloc::git+https://github.com/microsoft/mimalloc.git"
         "${_realname}-onnx::git+https://github.com/onnx/onnx.git"
         "${_realname}-pocketfft::git+https://github.com/mreineck/pocketfft.git"
@@ -75,8 +75,7 @@ sha256sums=('SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
-            'SKIP'
-            '681204f62fb38872311928d01510c67b0387e3fd55e1599952d386bb62bffcdb'
+            'e66c6f9acd09ce0cf6e9c017b43f4d1b8e8ef174d28bd2a3c54a7df1dc5f1f4d'
             '5d5c8399bb8c26fba3bb8ef9cdabd6ec9c67ae289c1de4770356514469b0b952')
 
 apply_patch_with_msg() {
@@ -99,7 +98,6 @@ prepare() {
   git config submodule."third_party/fmt".url "${srcdir}/${_realname}-fmt"
   git config submodule."third_party/googletest".url "${srcdir}/${_realname}-googletest"
   git config submodule."third_party/mimalloc".url "${srcdir}/${_realname}-mimalloc"
-  git config submodule."third_party/nlohmann".url "${srcdir}/${_realname}-json"
   git config submodule."third_party/onnx".url "${srcdir}/${_realname}-onnx"
   git config submodule."third_party/pocketfft".url "${srcdir}/${_realname}-pocketfft"
   git config submodule."third_party/protobuf".url "${srcdir}/${_realname}-protobuf"
@@ -118,7 +116,6 @@ prepare() {
     third_party/fmt \
     third_party/googletest \
     third_party/mimalloc \
-    third_party/nlohmann \
     third_party/onnx \
     third_party/pocketfft \
     third_party/protobuf \
