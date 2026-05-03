@@ -66,7 +66,7 @@ sha256sums=('SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
-            'dab63c38e7f8db01e3b038d81551925acea7313492ead11fcf22bbbcdb55492a'
+            'a8726e57a2fbc45c1e138ee3b56f57f30fca97a0e4b6e2a3b434f3101f0884b1'
             '5d5c8399bb8c26fba3bb8ef9cdabd6ec9c67ae289c1de4770356514469b0b952')
 
 apply_patch_with_msg() {
@@ -112,6 +112,7 @@ build() {
 
   export PYTORCH_BUILD_VERSION="${pkgver}"
   export PYTORCH_BUILD_NUMBER="${pkgrel}"
+  export PYTORCH_PACKAGE_USE_DECLARED_SUBMODULES=1
   export BUILD_TEST=0
   export USE_CUDA=0
   export USE_ROCM=0
