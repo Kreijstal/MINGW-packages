@@ -1,5 +1,13 @@
+diff --git a/onnx/checker.h b/onnx/checker.h
+index f7a2f9f14..eb18b00ad 100644
+--- a/onnx/checker.h
++++ b/onnx/checker.h
+@@ -11,0 +12,3 @@
++#ifdef OPTIONAL
++#undef OPTIONAL
++#endif
 diff --git a/onnx/common/path.h b/onnx/common/path.h
-index 6ded89876..cabce2134 100644
+index 6ded89876..95f7d4fc9 100644
 --- a/onnx/common/path.h
 +++ b/onnx/common/path.h
 @@ -16,0 +17,3 @@

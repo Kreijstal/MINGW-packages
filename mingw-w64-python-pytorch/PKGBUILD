@@ -43,7 +43,7 @@ source=("${_realname}::git+https://github.com/pytorch/pytorch.git#tag=v${pkgver}
         "0002-third_party-onnx-optional-macro.patch")
 sha256sums=('SKIP'
             'dffcefcca649918d0548aa6224e23a8f2c14187fe8b21f58e569172826ae31a1'
-            '61a97ae06b124f722cb97e00c5a3848a1f7ca331b1afa042a9133cb0f0567959')
+            '5d5c8399bb8c26fba3bb8ef9cdabd6ec9c67ae289c1de4770356514469b0b952')
 
 apply_patch_with_msg() {
   for _patch in "$@"; do
@@ -60,7 +60,7 @@ prepare() {
   apply_patch_with_msg \
     0001-pytorch-mingw-port.patch
 
-  git -C third_party/onnx apply "${srcdir}/0002-third_party-onnx-optional-macro.patch"
+  patch -Nbp1 -d third_party/onnx -i "${srcdir}/0002-third_party-onnx-optional-macro.patch"
 }
 
 build() {
