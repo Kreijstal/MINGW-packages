@@ -122,6 +122,18 @@ index 86a7b75f973..fcd3fcee7e2 100644
  #endif // defined(_WIN32)
 
  // Creates the filename pattern passed to and completed by `mkstemp`.
+diff --git a/caffe2/utils/string_utils.h b/caffe2/utils/string_utils.h
+index 6bf3b867b54..12bfd237836 100644
+--- a/caffe2/utils/string_utils.h
++++ b/caffe2/utils/string_utils.h
+@@ -1,6 +1,7 @@
+ #pragma once
+
+ #include <algorithm>
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <vector>
 diff --git a/caffe2/utils/threadpool/WorkersPool.h b/caffe2/utils/threadpool/WorkersPool.h
 index 6504d70c25c..87bb1cc6bc9 100644
 --- a/caffe2/utils/threadpool/WorkersPool.h
