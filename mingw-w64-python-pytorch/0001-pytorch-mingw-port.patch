@@ -70,6 +70,47 @@ index bba089bb2ad..b9f04ea6931 100644
 
  // Internal, use ThreadLocalStateGuard
  C10_API void _force_tls_local_dispatch_key_set(LocalDispatchKeySet key_set);
+diff --git a/c10/core/impl/alloc_cpu.cpp b/c10/core/impl/alloc_cpu.cpp
+index d48a6251ed5..ebb4067656b 100644
+--- a/c10/core/impl/alloc_cpu.cpp
++++ b/c10/core/impl/alloc_cpu.cpp
+@@ -8,6 +8,9 @@
+ #include <c10/util/irange.h>
+ #include <c10/util/numa.h>
+ #include <cstring>
++#ifdef _WIN32
++#include <malloc.h>
++#endif
+
+ #ifdef USE_MIMALLOC
+ #include <mimalloc.h>
+@@ -69,7 +72,7 @@ inline bool is_thp_alloc(size_t nbytes) {
+   return (is_thp_alloc_enabled() && (nbytes >= gAlloc_threshold_thp));
+ }
+
+-#elif !defined(__ANDROID__) && !defined(_MSC_VER)
++#elif !defined(__ANDROID__) && !defined(_WIN32)
+ constexpr size_t c10_compute_alignment(size_t /*nbytes*/) {
+   return gAlignment;
+ }
+@@ -115,7 +118,7 @@ void* alloc_cpu(size_t nbytes) {
+       "DefaultCPUAllocator: not enough memory: you tried to allocate ",
+       nbytes,
+       " bytes.");
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   data = _aligned_malloc(nbytes, gAlignment);
+   CAFFE_ENFORCE(
+       data,
+@@ -165,7 +168,7 @@ void* alloc_cpu(size_t nbytes) {
+ void free_cpu(void* data) {
+ #ifdef USE_MIMALLOC
+   mi_free(data);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   _aligned_free(data);
+ #else
+   // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
 diff --git a/c10/util/Flags.h b/c10/util/Flags.h
 index 0d460db224a..ede60e8105e 100644
 --- a/c10/util/Flags.h
