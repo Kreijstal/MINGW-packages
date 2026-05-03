@@ -15,7 +15,7 @@ index 60501c6b537..e4b148e2932 100644
      const Tensor& B,
      const Tensor& qGroupSize,
 diff --git a/c10/core/impl/LocalDispatchKeySet.cpp b/c10/core/impl/LocalDispatchKeySet.cpp
-index c8277f19acc..e34cf516b7e 100644
+index 0b3d87fce24..a80ecedca71 100644
 --- a/c10/core/impl/LocalDispatchKeySet.cpp
 +++ b/c10/core/impl/LocalDispatchKeySet.cpp
 @@ -13,11 +13,11 @@ namespace c10::impl {
@@ -33,7 +33,7 @@ index c8277f19acc..e34cf516b7e 100644
  void _force_tls_local_dispatch_key_set(LocalDispatchKeySet key_set) {
    raw_local_dispatch_key_set.set_included(key_set.included_);
 diff --git a/c10/core/impl/LocalDispatchKeySet.h b/c10/core/impl/LocalDispatchKeySet.h
-index bd8fe811b2c..a48d4243446 100644
+index bba089bb2ad..b9f04ea6931 100644
 --- a/c10/core/impl/LocalDispatchKeySet.h
 +++ b/c10/core/impl/LocalDispatchKeySet.h
 @@ -62,9 +62,9 @@ struct C10_API LocalDispatchKeySet {
@@ -170,10 +170,34 @@ index 6504d70c25c..87bb1cc6bc9 100644
  #else
        free((void*)p);
 diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
-index 1e20bd26273..36de6440ed7 100644
+index dac0d1f41c3..013cca3d0d6 100644
 --- a/cmake/Dependencies.cmake
 +++ b/cmake/Dependencies.cmake
-@@ -1707,8 +1707,9 @@ add_library(httplib INTERFACE IMPORTED)
+@@ -1592,10 +1592,7 @@ endif()
+ # This was the default behavior before version 12.0.0.
+ # Since PyTorch C API depends on it, make it available for projects that
+ # depend on PyTorch.
+-set(FMT_INSTALL ON)
+-set(TEMP_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libs" FORCE)
+-add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/fmt)
++find_package(fmt CONFIG REQUIRED)
+
+ # Disable compiler feature checks for `fmt`.
+ #
+@@ -1604,10 +1601,9 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/fmt)
+ # CMAKE_CXX_FLAGS in ways that break feature checks. Since we already know
+ # `fmt` is compatible with a superset of the compilers that PyTorch is, it
+ # shouldn't be too bad to just disable the checks.
+-set_target_properties(fmt-header-only PROPERTIES INTERFACE_COMPILE_FEATURES "")
++set_target_properties(fmt::fmt-header-only PROPERTIES INTERFACE_COMPILE_FEATURES "")
+
+ list(APPEND Caffe2_DEPENDENCY_LIBS fmt::fmt-header-only)
+-set(BUILD_SHARED_LIBS ${TEMP_BUILD_SHARED_LIBS} CACHE BOOL "Build shared libs" FORCE)
+
+ # ---[ Kineto
+ # edge profiler depends on KinetoProfiler but it only does cpu
+@@ -1695,8 +1691,9 @@ add_library(httplib INTERFACE IMPORTED)
  target_include_directories(httplib SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/third_party/cpp-httplib)
 
  # Include nlohmann-json
@@ -184,8 +208,18 @@ index 1e20bd26273..36de6440ed7 100644
 
  # Include moodycamel
  add_library(moodycamel INTERFACE IMPORTED)
+diff --git a/cmake/FlatBuffers.cmake b/cmake/FlatBuffers.cmake
+index 2e8e1b957db..16a4f806ba1 100644
+--- a/cmake/FlatBuffers.cmake
++++ b/cmake/FlatBuffers.cmake
+@@ -1,4 +1,4 @@
+-set(FlatBuffers_Include ${PROJECT_SOURCE_DIR}/third_party/flatbuffers/include)
++find_path(FlatBuffers_Include flatbuffers/flatbuffers.h REQUIRED)
+ file(GLOB FlatBuffers_Library_SRCS
+   ${FlatBuffers_Include}/flatbuffers/*.h
+ )
 diff --git a/cmake/public/utils.cmake b/cmake/public/utils.cmake
-index a667ad55771..423c012d0a3 100644
+index 731bbe7d218..90c26904490 100644
 --- a/cmake/public/utils.cmake
 +++ b/cmake/public/utils.cmake
 @@ -120,7 +120,7 @@ endfunction()
@@ -251,10 +285,10 @@ index daf768ee625..ae8a72d0096 100644
    static _locale_t loc = _create_locale(LC_ALL, "C");
    return _strtod_l(nptr, endptr, loc);
 diff --git a/torch/headeronly/macros/Macros.h b/torch/headeronly/macros/Macros.h
-index cef99df3f56..9df801ebcde 100644
+index 63aa0d20d8e..d05480c2373 100644
 --- a/torch/headeronly/macros/Macros.h
 +++ b/torch/headeronly/macros/Macros.h
-@@ -421,7 +421,7 @@ static inline int C10_WARP_SIZE_INTERNAL() {
+@@ -374,7 +374,7 @@ static inline int C10_WARP_SIZE_INTERNAL() {
  #define CUDA_KERNEL_ASSERT_MSG(cond, msg)
  #define CUDA_KERNEL_ASSERT_PRINTF(cond, msg, ...)
  #define SYCL_KERNEL_ASSERT(cond)

@@ -23,14 +23,19 @@ depends=("${MINGW_PACKAGE_PREFIX}-python"
          "${MINGW_PACKAGE_PREFIX}-python-optree"
          "${MINGW_PACKAGE_PREFIX}-python-sympy"
          "${MINGW_PACKAGE_PREFIX}-python-typing_extensions"
+         "${MINGW_PACKAGE_PREFIX}-eigen3"
          "${MINGW_PACKAGE_PREFIX}-gcc-libs"
+         "${MINGW_PACKAGE_PREFIX}-fmt"
+         "${MINGW_PACKAGE_PREFIX}-flatbuffers"
          "${MINGW_PACKAGE_PREFIX}-nlohmann-json"
          "${MINGW_PACKAGE_PREFIX}-openblas")
 makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
+             "${MINGW_PACKAGE_PREFIX}-benchmark"
              "${MINGW_PACKAGE_PREFIX}-cmake"
              "git"
              "${MINGW_PACKAGE_PREFIX}-ninja"
              "${MINGW_PACKAGE_PREFIX}-protobuf"
+             "${MINGW_PACKAGE_PREFIX}-pybind11"
              "${MINGW_PACKAGE_PREFIX}-python-build"
              "${MINGW_PACKAGE_PREFIX}-python-installer"
              "${MINGW_PACKAGE_PREFIX}-python-packaging"
@@ -42,19 +47,12 @@ options=(!strip)
 source=("${_realname}::git+https://github.com/pytorch/pytorch.git#tag=v${pkgver}"
         "${_realname}-FP16::git+https://github.com/Maratyszcza/FP16.git"
         "${_realname}-FXdiv::git+https://github.com/Maratyszcza/FXdiv.git"
-        "${_realname}-benchmark::git+https://github.com/google/benchmark.git"
         "${_realname}-cpp-httplib::git+https://github.com/yhirose/cpp-httplib.git"
         "${_realname}-cpuinfo::git+https://github.com/pytorch/cpuinfo.git"
-        "${_realname}-flatbuffers::git+https://github.com/google/flatbuffers.git"
-        "${_realname}-fmt::git+https://github.com/fmtlib/fmt.git"
-        "${_realname}-googletest::git+https://github.com/google/googletest.git"
-        "${_realname}-mimalloc::git+https://github.com/microsoft/mimalloc.git"
         "${_realname}-onnx::git+https://github.com/onnx/onnx.git"
         "${_realname}-pocketfft::git+https://github.com/mreineck/pocketfft.git"
-        "${_realname}-protobuf::git+https://github.com/protocolbuffers/protobuf.git"
         "${_realname}-psimd::git+https://github.com/Maratyszcza/psimd.git"
         "${_realname}-pthreadpool::git+https://github.com/Maratyszcza/pthreadpool.git"
-        "${_realname}-pybind11::git+https://github.com/pybind/pybind11.git"
         "${_realname}-sleef::git+https://github.com/shibatch/sleef.git"
         "0001-pytorch-mingw-port.patch"
         "0002-third_party-onnx-optional-macro.patch")
@@ -68,14 +66,7 @@ sha256sums=('SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
-            'SKIP'
-            'SKIP'
-            'SKIP'
-            'SKIP'
-            'SKIP'
-            'SKIP'
-            'SKIP'
-            'e66c6f9acd09ce0cf6e9c017b43f4d1b8e8ef174d28bd2a3c54a7df1dc5f1f4d'
+            'dab63c38e7f8db01e3b038d81551925acea7313492ead11fcf22bbbcdb55492a'
             '5d5c8399bb8c26fba3bb8ef9cdabd6ec9c67ae289c1de4770356514469b0b952')
 
 apply_patch_with_msg() {
@@ -91,45 +82,24 @@ prepare() {
   git submodule init
   git config submodule."third_party/FP16".url "${srcdir}/${_realname}-FP16"
   git config submodule."third_party/FXdiv".url "${srcdir}/${_realname}-FXdiv"
-  git config submodule."third_party/benchmark".url "${srcdir}/${_realname}-benchmark"
   git config submodule."third_party/cpp-httplib".url "${srcdir}/${_realname}-cpp-httplib"
   git config submodule."third_party/cpuinfo".url "${srcdir}/${_realname}-cpuinfo"
-  git config submodule."third_party/flatbuffers".url "${srcdir}/${_realname}-flatbuffers"
-  git config submodule."third_party/fmt".url "${srcdir}/${_realname}-fmt"
-  git config submodule."third_party/googletest".url "${srcdir}/${_realname}-googletest"
-  git config submodule."third_party/mimalloc".url "${srcdir}/${_realname}-mimalloc"
   git config submodule."third_party/onnx".url "${srcdir}/${_realname}-onnx"
   git config submodule."third_party/pocketfft".url "${srcdir}/${_realname}-pocketfft"
-  git config submodule."third_party/protobuf".url "${srcdir}/${_realname}-protobuf"
   git config submodule."third_party/psimd".url "${srcdir}/${_realname}-psimd"
   git config submodule."third_party/pthreadpool".url "${srcdir}/${_realname}-pthreadpool"
-  git config submodule."third_party/pybind11".url "${srcdir}/${_realname}-pybind11"
   git config submodule."third_party/sleef".url "${srcdir}/${_realname}-sleef"
 
   git -c protocol.file.allow=always submodule update --init \
     third_party/FP16 \
     third_party/FXdiv \
-    third_party/benchmark \
     third_party/cpp-httplib \
     third_party/cpuinfo \
-    third_party/flatbuffers \
-    third_party/fmt \
-    third_party/googletest \
-    third_party/mimalloc \
     third_party/onnx \
     third_party/pocketfft \
-    third_party/protobuf \
     third_party/psimd \
     third_party/pthreadpool \
-    third_party/pybind11 \
     third_party/sleef
-
-  git -C third_party/protobuf submodule init
-  git -C third_party/protobuf config submodule."third_party/benchmark".url "${srcdir}/${_realname}-benchmark"
-  git -C third_party/protobuf config submodule."third_party/googletest".url "${srcdir}/${_realname}-googletest"
-  git -C third_party/protobuf -c protocol.file.allow=always submodule update --init \
-    third_party/benchmark \
-    third_party/googletest
 
   apply_patch_with_msg \
     0001-pytorch-mingw-port.patch
@@ -160,6 +130,12 @@ build() {
   export USE_MPS=0
   export USE_XPU=0
   export USE_ITT=0
+  export USE_MIMALLOC=0
+  export USE_SYSTEM_BENCHMARK=1
+  export USE_SYSTEM_EIGEN_INSTALL=1
+  export USE_SYSTEM_PYBIND11=1
+  export BUILD_CUSTOM_PROTOBUF=0
+  export CAFFE2_LINK_LOCAL_PROTOBUF=0
   export BLAS=OpenBLAS
   export OpenBLAS_HOME="${MINGW_PREFIX}"
   export OpenBLAS_LIB_NAME=openblas
