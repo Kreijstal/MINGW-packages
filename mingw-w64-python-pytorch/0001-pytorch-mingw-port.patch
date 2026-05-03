@@ -1,3 +1,16 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 188f08bb272..3653fa2544c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -403,7 +403,7 @@ option(USE_MIMALLOC "Use mimalloc" OFF)
+ # Enable third party mimalloc library to improve memory allocation performance
+ # on Windows and AArch64.
+ option(USE_MIMALLOC_ON_MKL "Use mimalloc on MKL" OFF)
+-if(WIN32 OR (CPU_AARCH64 AND NOT APPLE))
++if((WIN32 OR (CPU_AARCH64 AND NOT APPLE)) AND NOT "$ENV{USE_MIMALLOC}" STREQUAL "0")
+   set(USE_MIMALLOC ON)
+   # Disable OPT flags for mimalloc on aarch64 as it breaks ARMv8.0
+   # See https://github.com/pytorch/pytorch/issues/174344
 diff --git a/aten/src/ATen/native/quantized/cpu/qlinear.h b/aten/src/ATen/native/quantized/cpu/qlinear.h
 index 60501c6b537..e4b148e2932 100644
 --- a/aten/src/ATen/native/quantized/cpu/qlinear.h
@@ -170,10 +183,24 @@ index 6504d70c25c..87bb1cc6bc9 100644
  #else
        free((void*)p);
 diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
-index dac0d1f41c3..013cca3d0d6 100644
+index dac0d1f41c3..719f3b68138 100644
 --- a/cmake/Dependencies.cmake
 +++ b/cmake/Dependencies.cmake
-@@ -1592,10 +1592,7 @@ endif()
+@@ -795,8 +795,11 @@ endif()
+ # Due to license considerations, we will only use the MPL2 parts of Eigen.
+ set(EIGEN_MPL2_ONLY 1)
+ if(USE_SYSTEM_EIGEN_INSTALL)
+-  find_package(Eigen3)
+-  if(EIGEN3_FOUND)
++  find_package(Eigen3 CONFIG QUIET)
++  if(TARGET Eigen3::Eigen)
++    get_target_property(EIGEN3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
++    message(STATUS "Found system Eigen at " ${EIGEN3_INCLUDE_DIR})
++  elseif(EIGEN3_FOUND OR Eigen3_FOUND)
+     message(STATUS "Found system Eigen at " ${EIGEN3_INCLUDE_DIR})
+   else()
+     message(STATUS "Did not find system Eigen. Using third party subdirectory.")
+@@ -1592,10 +1595,7 @@ endif()
  # This was the default behavior before version 12.0.0.
  # Since PyTorch C API depends on it, make it available for projects that
  # depend on PyTorch.
@@ -185,7 +212,7 @@ index dac0d1f41c3..013cca3d0d6 100644
 
  # Disable compiler feature checks for `fmt`.
  #
-@@ -1604,10 +1601,9 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/fmt)
+@@ -1604,10 +1604,9 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/fmt)
  # CMAKE_CXX_FLAGS in ways that break feature checks. Since we already know
  # `fmt` is compatible with a superset of the compilers that PyTorch is, it
  # shouldn't be too bad to just disable the checks.
@@ -197,7 +224,7 @@ index dac0d1f41c3..013cca3d0d6 100644
 
  # ---[ Kineto
  # edge profiler depends on KinetoProfiler but it only does cpu
-@@ -1695,8 +1691,9 @@ add_library(httplib INTERFACE IMPORTED)
+@@ -1695,8 +1694,9 @@ add_library(httplib INTERFACE IMPORTED)
  target_include_directories(httplib SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/third_party/cpp-httplib)
 
  # Include nlohmann-json
