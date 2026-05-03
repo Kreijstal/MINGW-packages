@@ -42,7 +42,7 @@ source=("${_realname}::git+https://github.com/pytorch/pytorch.git#tag=v${pkgver}
         "0001-pytorch-mingw-port.patch"
         "0002-third_party-onnx-optional-macro.patch")
 sha256sums=('SKIP'
-            '44b000a3051600e55e952d5d45a315f72580aecc0ddfafddee82fca0251fbc39'
+            '681204f62fb38872311928d01510c67b0387e3fd55e1599952d386bb62bffcdb'
             '5d5c8399bb8c26fba3bb8ef9cdabd6ec9c67ae289c1de4770356514469b0b952')
 
 apply_patch_with_msg() {

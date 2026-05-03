@@ -248,3 +248,28 @@ index cef99df3f56..9df801ebcde 100644
  #if defined(NDEBUG)
  extern "C" {
  C10_IMPORT
+diff --git a/torch/nativert/common/FileUtil.h b/torch/nativert/common/FileUtil.h
+index 6fa82347ac2..da62c48d52b 100644
+--- a/torch/nativert/common/FileUtil.h
++++ b/torch/nativert/common/FileUtil.h
+@@ -17,7 +17,9 @@
+ // This is a massive pain to have be an `int` due to the pthread implementation
+ // we support, but it's far more compatible with the rest of the windows world
+ // as an `int` than it would be as a `void*`
++#ifndef __MINGW32__
+ using pid_t = int;
++#endif
+
+ using uid_t = int;
+ using gid_t = int;
+@@ -31,8 +33,10 @@ using ssize_t = SSIZE_T;
+ #define HAVE_MODE_T 1
+ // The Windows headers don't define this anywhere, nor do any of the libs
+ // that Folly depends on, so define it here.
++#ifndef __MINGW32__
+ using mode_t = unsigned int;
+ #endif
++#endif
+
+ // Copied from folly/portability/Fcntl.h
+ #define O_CLOEXEC _O_NOINHERIT
