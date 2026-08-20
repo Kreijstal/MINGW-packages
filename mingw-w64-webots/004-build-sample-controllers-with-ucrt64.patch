@@ -1,0 +1,40 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -240,7 +240,23 @@ set(WEBOTS_SAMPLE_CONTROLLER_ENV
+ )
+ 
+ if(WIN32)
++  find_program(WEBOTS_BASH_EXECUTABLE bash REQUIRED)
++  list(REMOVE_ITEM WEBOTS_SAMPLE_CONTROLLER_ENV
++    WEBOTS_CONTROLLER_C_LIB=${CMAKE_BINARY_DIR}/src/controller/c/libController.so
++    WEBOTS_CONTROLLER_CPP_LIB=${CMAKE_BINARY_DIR}/src/controller/cpp/libCppController.so
++  )
++  list(APPEND WEBOTS_SAMPLE_CONTROLLER_ENV
++    WEBOTS_CONTROLLER_C_LIB=${CMAKE_BINARY_DIR}/src/controller/c/libController.dll.a
++    WEBOTS_CONTROLLER_CPP_LIB=${CMAKE_BINARY_DIR}/src/controller/cpp/libCppController.dll.a
++  )
++  set(WEBOTS_BUILD_CONTROLLERS_TOOLCHAIN
++    MSYSTEM=UCRT64
++    PATH=/ucrt64/bin:/usr/bin
++    CC=gcc
++    CXX=g++
++  )
+-  set(WEBOTS_BUILD_CONTROLLERS_COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/build_controllers.sh)
++  set(WEBOTS_BUILD_CONTROLLERS_COMMAND ${WEBOTS_BASH_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/build_controllers.sh)
+ else()
++  set(WEBOTS_BUILD_CONTROLLERS_TOOLCHAIN)
+   set(WEBOTS_BUILD_CONTROLLERS_COMMAND ${CMAKE_SOURCE_DIR}/scripts/build_controllers.sh)
+ endif()
+@@ -253,4 +270,5 @@ add_custom_target(webots_sample_controllers
+   COMMAND ${CMAKE_COMMAND} -E env
+     ${WEBOTS_SAMPLE_CONTROLLER_ENV}
++    ${WEBOTS_BUILD_CONTROLLERS_TOOLCHAIN}
+     ${WEBOTS_BUILD_CONTROLLERS_COMMAND}
+   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+@@ -267,4 +285,5 @@ add_custom_target(webots_sample_controllers_strict ${WEBOTS_SAMPLE_CONTROLLERS_STRICT_ALL}
+   COMMAND ${CMAKE_COMMAND} -E env
+     ${WEBOTS_SAMPLE_CONTROLLER_ENV}
++    ${WEBOTS_BUILD_CONTROLLERS_TOOLCHAIN}
+     WEBOTS_CONTROLLERS_STRICT=1
+     ${WEBOTS_BUILD_CONTROLLERS_COMMAND}

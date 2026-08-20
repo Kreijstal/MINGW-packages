@@ -1,0 +1,10 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -279,7 +279,7 @@ add_custom_target(webots_sample_controllers
+ 
+ set(WEBOTS_SAMPLE_CONTROLLERS_STRICT_ALL)
+-if(WEBOTS_PACKAGE_BUILD)
++if(WEBOTS_PACKAGE_BUILD AND NOT WIN32)
+   set(WEBOTS_SAMPLE_CONTROLLERS_STRICT_ALL ALL)
+ endif()

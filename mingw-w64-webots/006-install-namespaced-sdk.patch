@@ -1,0 +1,141 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -133 +133 @@
+-set(WEBOTS_PC_LIBDIR "\${pcfiledir}/..")
++set(WEBOTS_PC_LIBDIR "\${pcfiledir}/../webots")
+@@ -134 +134 @@
+-set(WEBOTS_PC_INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
++set(WEBOTS_PC_INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}/webots")
+@@ -218 +218 @@
+-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/webots
+@@ -229,4 +229,5 @@
+ install(TARGETS Controller CppController
+-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/webots
++  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/webots
+ )
+diff --git a/resources/make/sdk.mk b/resources/make/sdk.mk
+--- a/resources/make/sdk.mk
++++ b/resources/make/sdk.mk
+@@ -21,5 +21,7 @@
+-ifeq ($(OSTYPE),linux)
+- webots_pkg_config_exists = $(shell $(WEBOTS_PKG_CONFIG) --exists $(1) >/dev/null 2>&1 && echo true)
+- webots_pkg_config_cflags = $(shell $(WEBOTS_PKG_CONFIG) --cflags $(1) 2>/dev/null)
+- webots_pkg_config_libs = $(shell $(WEBOTS_PKG_CONFIG) --libs $(1) 2>/dev/null)
+-endif
++webots_pkg_config_exists = $(shell $(WEBOTS_PKG_CONFIG) --exists $(1) >/dev/null 2>&1 && echo true)
++webots_pkg_config_cflags = $(shell $(WEBOTS_PKG_CONFIG) --cflags $(1) 2>/dev/null)
++webots_pkg_config_libs = $(shell $(WEBOTS_PKG_CONFIG) --libs $(1) 2>/dev/null)
++
++WEBOTS_CONTROLLER_C_INCLUDE_PATH ?= $(WEBOTS_HOME)/include/controller/c
++WEBOTS_CONTROLLER_CPP_INCLUDE_PATH ?= $(WEBOTS_HOME)/include/controller/cpp
++WEBOTS_ODE_INCLUDE_PATH ?= $(WEBOTS_HOME)/include
+@@ -80 +82 @@
+-    INCLUDE += -I"$(WEBOTS_HOME)/include/controller/c"
++    INCLUDE += -I"$(WEBOTS_CONTROLLER_C_INCLUDE_PATH)"
+@@ -89 +91 @@
+-     INCLUDE += -I"$(WEBOTS_HOME)/include/controller/cpp"
++     INCLUDE += -I"$(WEBOTS_CONTROLLER_CPP_INCLUDE_PATH)"
+@@ -99 +101 @@
+-     INCLUDE += -I"$(WEBOTS_HOME)/include/controller/c"
++     INCLUDE += -I"$(WEBOTS_CONTROLLER_C_INCLUDE_PATH)"
+@@ -106 +108 @@
+-     INCLUDE += -I"$(WEBOTS_HOME)/include/controller/cpp"
++     INCLUDE += -I"$(WEBOTS_CONTROLLER_CPP_INCLUDE_PATH)"
+@@ -130 +132 @@
+-    INCLUDE += -I"$(WEBOTS_HOME)/include/controller/c"
++    INCLUDE += -I"$(WEBOTS_CONTROLLER_C_INCLUDE_PATH)"
+@@ -137 +139 @@
+-    INCLUDE += -I"$(WEBOTS_HOME)/include/controller/c"
++    INCLUDE += -I"$(WEBOTS_CONTROLLER_C_INCLUDE_PATH)"
+@@ -189 +191 @@
+-   INCLUDE += -I"$(WEBOTS_HOME)/include/ode" -I"$(WEBOTS_HOME)/include"
++   INCLUDE += -I"$(WEBOTS_ODE_INCLUDE_PATH)/ode" -I"$(WEBOTS_ODE_INCLUDE_PATH)"
+diff --git a/src/controller/c/CMakeLists.txt b/src/controller/c/CMakeLists.txt
+--- a/src/controller/c/CMakeLists.txt
++++ b/src/controller/c/CMakeLists.txt
+@@ -100 +100 @@
+-    $<INSTALL_INTERFACE:include>
++    $<INSTALL_INTERFACE:include/webots>
+@@ -104 +104 @@
+-    $<INSTALL_INTERFACE:include/controller/c>
++    $<INSTALL_INTERFACE:include/webots/controller/c>
+@@ -142,8 +141,0 @@
+-# Install rules
+-install(TARGETS ${CONTROLLER_LIBRARY_NAME}
+-  DESTINATION lib
+-)
+-
+-install(FILES ${CONTROLLER_HEADERS}
+-  DESTINATION include
+-)
+diff --git a/src/controller/cpp/CMakeLists.txt b/src/controller/cpp/CMakeLists.txt
+--- a/src/controller/cpp/CMakeLists.txt
++++ b/src/controller/cpp/CMakeLists.txt
+@@ -52 +52 @@
+-    $<INSTALL_INTERFACE:include/controller/cpp>
++    $<INSTALL_INTERFACE:include/webots/controller/cpp>
+@@ -54 +54 @@
+-    $<INSTALL_INTERFACE:include> # added because some include files are not in the cpp folder#
++    $<INSTALL_INTERFACE:include/webots> # added because some include files are not in the cpp folder
+@@ -75,6 +74,0 @@
+-# Install rules
+-install(TARGETS ${CONTROLLER_CPP_LIBRARY_NAME}
+-  DESTINATION lib
+-)
+-
+-# No need to install header files separately in C++, they are typically included via target_include_directories
+diff --git a/src/webots/core/WbStandardPaths.cpp b/src/webots/core/WbStandardPaths.cpp
+--- a/src/webots/core/WbStandardPaths.cpp
++++ b/src/webots/core/WbStandardPaths.cpp
+@@ -159 +159,15 @@
+-  static QString path = webotsHomePath() + cMacOsContents + "lib/controller/";
++  static QString path;
++  if (path.isEmpty()) {
++    QDir packagePrefix(webotsHomePath());
++    if (packagePrefix.cdUp() && packagePrefix.cdUp()) {
++#ifdef _WIN32
++      const QString packageLibraryPath = packagePrefix.filePath("bin");
++#else
++      const QString packageLibraryPath = packagePrefix.filePath("lib");
++#endif
++      if (QDir(packageLibraryPath).exists())
++        path = QDir::cleanPath(packageLibraryPath) + "/";
++    }
++    if (path.isEmpty())
++      path = webotsHomePath() + cMacOsContents + "lib/controller/";
++  }
+diff --git a/src/webots/editor/WbBuildEditor.cpp b/src/webots/editor/WbBuildEditor.cpp
+--- a/src/webots/editor/WbBuildEditor.cpp
++++ b/src/webots/editor/WbBuildEditor.cpp
+@@ -537,0 +538,18 @@
++  // A package-managed Webots home contains resources and projects under
++  // <prefix>/share/webots, while its SDK follows the platform prefix layout.
++  // Export the SDK locations so relocated projects keep using the read-only
++  // installation as their toolchain without trying to modify it.
++  QDir packagePrefix(WbStandardPaths::webotsHomePath());
++  if (packagePrefix.cdUp() && packagePrefix.cdUp()) {
++    const QString includeRoot = packagePrefix.filePath("include/webots");
++    const QString libraryRoot = packagePrefix.filePath("lib/webots");
++    if (QDir(includeRoot).exists() && QDir(libraryRoot).exists()) {
++      env.insert("WEBOTS_CONTROLLER_C_INCLUDE_PATH", QDir(includeRoot).filePath("controller/c"));
++      env.insert("WEBOTS_CONTROLLER_CPP_INCLUDE_PATH", QDir(includeRoot).filePath("controller/cpp"));
++      env.insert("WEBOTS_ODE_INCLUDE_PATH", includeRoot);
++      env.insert("WEBOTS_CONTROLLER_LIB_PATH", libraryRoot);
++      env.insert("WEBOTS_LIB_PATH", libraryRoot);
++      env.insert("PKG_CONFIG_PATH", packagePrefix.filePath("lib/pkgconfig"));
++    }
++  }
++
+diff --git a/src/ode/CMakeLists.txt b/src/ode/CMakeLists.txt
+--- a/src/ode/CMakeLists.txt
++++ b/src/ode/CMakeLists.txt
+@@ -78,2 +78,2 @@
+-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/webots
++    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/webots

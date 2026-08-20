@@ -1,0 +1,101 @@
+# Maintainer: Kreijstal
+
+_realname=webots
+pkgbase=mingw-w64-${_realname}
+pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
+pkgver=R2025b.r0.gb565d29ff
+pkgrel=3
+pkgdesc="Open-source robot simulator (mingw-w64)"
+arch=('any')
+mingw_arch=('mingw64' 'ucrt64')
+url="https://cyberbotics.com/"
+msys2_repository_url="https://github.com/kreijstal-contributions/webots"
+license=('spdx:Apache-2.0')
+depends=(
+  "${MINGW_PACKAGE_PREFIX}-assimp"
+  "${MINGW_PACKAGE_PREFIX}-cc-libs"
+  "${MINGW_PACKAGE_PREFIX}-dlfcn"
+  "${MINGW_PACKAGE_PREFIX}-ffmpeg"
+  "${MINGW_PACKAGE_PREFIX}-freetype"
+  "${MINGW_PACKAGE_PREFIX}-gcc"
+  "${MINGW_PACKAGE_PREFIX}-glm"
+  "${MINGW_PACKAGE_PREFIX}-libwinpthread"
+  "${MINGW_PACKAGE_PREFIX}-ois"
+  "${MINGW_PACKAGE_PREFIX}-openal"
+  "${MINGW_PACKAGE_PREFIX}-openvr"
+  "${MINGW_PACKAGE_PREFIX}-qt6-base"
+  "${MINGW_PACKAGE_PREFIX}-qt6-declarative"
+  "${MINGW_PACKAGE_PREFIX}-qt6-websockets"
+  "${MINGW_PACKAGE_PREFIX}-stb"
+  make
+  "${MINGW_PACKAGE_PREFIX}-pkgconf"
+  "${MINGW_PACKAGE_PREFIX}-python"
+)
+makedepends=(
+  "${MINGW_PACKAGE_PREFIX}-cmake"
+  "${MINGW_PACKAGE_PREFIX}-ninja"
+  "${MINGW_PACKAGE_PREFIX}-pkgconf"
+  patch
+)
+_commit=b565d29ff98076a295de2492abcfaeed0b064201
+_picotts_commit=d42a96fe93629202147b6e40e93133766b2229d8
+_sourcedir="${_realname}-${_commit}"
+_picotts_sourcedir="picotts-${_picotts_commit}"
+source=(
+  "${_sourcedir}.tar.gz::https://github.com/kreijstal-contributions/webots/archive/${_commit}.tar.gz"
+  "${_picotts_sourcedir}.tar.gz::https://github.com/Kreijstal/picotts/archive/${_picotts_commit}.tar.gz"
+  '001-package-install-layout.patch'
+  '002-use-packaged-picotts-source.patch'
+  '003-run-controller-builders-through-bash-on-windows.patch'
+  '004-build-sample-controllers-with-ucrt64.patch'
+  '005-use-shipped-windows-controllers.patch'
+  '006-install-namespaced-sdk.patch'
+)
+sha256sums=('22cbc4115097610d642679d9107b50bb6d467c29937973bfb9000212f106ecb1'
+            '69a34a386d8c0ec378ef3e7b6e7ef2a1b0c6e26a7ca05b4e05bbb14192ea1ee0'
+            '014c61b140a105858ebc482b083fe68ff815be5ddeb5c77179275b19746fa7e5'
+            'd7f4f1f4d1d83d87730ad59d0a88a49d5e141b05c6c360c3089b45915d78f43a'
+            '6c414ac24da9b4ea5f57302750b55e84db90f3f83511a1c5580100d5b55a3f96'
+            '7e631c483dba1b75540c17d2e2afc8c2afc8ce116baddb6564fbe84be925b52e'
+            'ce39ca4fb73c813d3f9a5afb1888f9643760089d67aa8448063fa9f94d460ee5'
+            '19212a7bc015e3fdbd59166ff3434749adaf77985867c2579915a785fac926d2')
+
+prepare() {
+  cd "${srcdir}/${_sourcedir}"
+
+  patch -Nbp1 -i "${srcdir}/001-package-install-layout.patch"
+  patch -Nbp1 -i "${srcdir}/002-use-packaged-picotts-source.patch"
+  patch -Nbp1 -i "${srcdir}/003-run-controller-builders-through-bash-on-windows.patch"
+  patch -Nbp1 -i "${srcdir}/004-build-sample-controllers-with-ucrt64.patch"
+  patch -Nbp1 -i "${srcdir}/005-use-shipped-windows-controllers.patch"
+  patch -Nbp1 -i "${srcdir}/006-install-namespaced-sdk.patch"
+}
+
+build() {
+  local -a _build_type
+  if check_option "debug" "n"; then
+    _build_type=(-DCMAKE_BUILD_TYPE=Release)
+  else
+    _build_type=(-DCMAKE_BUILD_TYPE=Debug)
+  fi
+
+  MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
+    cmake \
+      -GNinja \
+      -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
+      -DPICOTTS_SOURCE_DIR="${srcdir}/${_picotts_sourcedir}" \
+      -DWEBOTS_PACKAGE_BUILD=ON \
+      "${_build_type[@]}" \
+      -S "${srcdir}/${_sourcedir}" \
+      -B "${srcdir}/build-${MSYSTEM}"
+
+  cmake --build "${srcdir}/build-${MSYSTEM}"
+}
+
+package() {
+  DESTDIR="${pkgdir}" \
+    cmake --install "${srcdir}/build-${MSYSTEM}"
+
+  install -Dm644 "${srcdir}/${_sourcedir}/LICENSE" \
+    "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE"
+}
