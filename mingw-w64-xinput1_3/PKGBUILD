@@ -1,0 +1,28 @@
+# Maintainer: Kreijstal
+
+_realname=xinput1_3
+pkgbase=mingw-w64-${_realname}
+pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="XInput 1.3 compatibility shim using the Windows XInput 9.1.0 runtime (mingw-w64)"
+arch=('any')
+mingw_arch=('mingw64' 'ucrt64')
+url="https://learn.microsoft.com/windows/win32/xinput/xinput-versions"
+license=('spdx:MIT')
+source=('xinput1_3.c' 'xinput1_3.def' 'LICENSE')
+sha256sums=('4c95a3613f3c9fb8dc3bf9af14bc8fb574e58160f05d0829d70e38f9f5210c27'
+            '1225eae3ebd93daacd4a2dce79d50859405dba1c3469dff3d286429fd82540b6'
+            'c6922a5079811b231fdd6dc8cd9ae26bd30f4d729e1eff6396e483aa16872dde')
+
+build() {
+  "${CC}" -shared -o "${srcdir}/XINPUT1_3.dll" \
+    "${srcdir}/xinput1_3.c" "${srcdir}/xinput1_3.def"
+}
+
+package() {
+  install -Dm755 "${srcdir}/XINPUT1_3.dll" \
+    "${pkgdir}${MINGW_PREFIX}/bin/XINPUT1_3.dll"
+  install -Dm644 "${srcdir}/LICENSE" \
+    "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE"
+}
