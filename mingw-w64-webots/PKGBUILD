@@ -4,7 +4,7 @@ _realname=webots
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
 pkgver=R2025b.r0.gf56cc3cd4
-pkgrel=3
+pkgrel=4
 pkgdesc="Open-source robot simulator (mingw-w64)"
 arch=('any')
 mingw_arch=('mingw64' 'ucrt64')
@@ -67,6 +67,10 @@ build() {
   else
     _build_type=(-DCMAKE_BUILD_TYPE=Debug)
   fi
+
+  WEBOTS_HOME="${srcdir}/${_sourcedir}" \
+    "${MINGW_PREFIX}/bin/python" \
+      "${srcdir}/${_sourcedir}/scripts/packaging/generate_proto_list.py"
 
   MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
     cmake \
