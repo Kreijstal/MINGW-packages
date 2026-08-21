@@ -1,4 +1,14 @@
 LIBRARY XINPUT1_3.dll
 EXPORTS
-  DllMain
-  XInputGetState=XINPUT9_1_0.XInputGetState
+  DllMain @1
+  XInputGetState=XINPUT9_1_0.XInputGetState @2
+  XInputSetState=XINPUT9_1_0.XInputSetState @3
+  XInputGetCapabilities=XINPUT9_1_0.XInputGetCapabilities @4
+  XInputEnable @5
+  XInputGetDSoundAudioDeviceGuids=XINPUT9_1_0.XInputGetDSoundAudioDeviceGuids @6
+  XInputGetBatteryInformation @7
+  XInputGetKeystroke @8
+  XInputGetStateEx @100 NONAME
+  XInputWaitForGuideButton @101 NONAME
+  XInputCancelGuideButtonWait @102 NONAME
+  XInputPowerOffController @103 NONAME
