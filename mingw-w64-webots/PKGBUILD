@@ -3,8 +3,9 @@
 _realname=webots
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
-pkgver=R2025b.r0.gf56cc3cd4
-pkgrel=4
+epoch=1
+pkgver=R2025b.r0.g1e3d80178
+pkgrel=1
 pkgdesc="Open-source robot simulator (mingw-w64)"
 arch=('any')
 mingw_arch=('mingw64' 'ucrt64')
@@ -41,7 +42,7 @@ makedepends=(
   "${MINGW_PACKAGE_PREFIX}-pkgconf"
   patch
 )
-_commit=f56cc3cd41bd199e6766651bb8801e5aedadb06a
+_commit=1e3d80178df302ab5cbcc598a72f84f6caf97155
 _picotts_commit=d42a96fe93629202147b6e40e93133766b2229d8
 _sourcedir="${_realname}-${_commit}"
 _picotts_sourcedir="picotts-${_picotts_commit}"
@@ -50,7 +51,7 @@ source=(
   "${_picotts_sourcedir}.tar.gz::https://github.com/Kreijstal/picotts/archive/${_picotts_commit}.tar.gz"
   '002-use-packaged-picotts-source.patch'
 )
-sha256sums=('3cc31ddc0801e5e4437b28e4c95d0baac214f4eca2283d585c0c09f40150265c'
+sha256sums=('f68c666d33680ec8b93c215b91da33009d61464f414a7bbea3b8b994445c9da2'
             '69a34a386d8c0ec378ef3e7b6e7ef2a1b0c6e26a7ca05b4e05bbb14192ea1ee0'
             'd7f4f1f4d1d83d87730ad59d0a88a49d5e141b05c6c360c3089b45915d78f43a')
 
